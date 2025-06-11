@@ -8,17 +8,16 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sirchampion.feeda",
+      "buildNumber": "1.0.0",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-      "buildNumber": "1.0.0"
-  
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -27,12 +26,13 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.sirchampion.feeda",
+      "package": "com.sirchampion",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
-        "CAMERA_ROLL",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
@@ -40,7 +40,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "520527fb-240d-4626-a251-c8e2bb965a38"
+        "projectId": "520527fb-105d-4626-a251-c8e2bb965a38"
       }
     },
     "plugins": [

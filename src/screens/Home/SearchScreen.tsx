@@ -1,4 +1,3 @@
-"use client"
 
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
@@ -31,7 +30,7 @@ import {
   Eye,
 } from "lucide-react-native"
 import { useNavigation } from "@react-navigation/native"
-
+import { Audio } from "expo-av"
 const { width: screenWidth } = Dimensions.get("window")
 
 interface SearchResult {

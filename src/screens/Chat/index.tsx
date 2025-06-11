@@ -24,7 +24,7 @@ import { useTheme } from "../../contexts/ThemeContext"
 import type { RootStackParamList } from "../../types/navigation"
 import { ArrowLeft, UserPlus, UserCheck, Send, X, Reply, Image as ImageIcon, Camera } from "lucide-react-native"
 import * as ImagePicker from "expo-image-picker"
-import { Audio } from "expo-audio"
+import { Audio } from "expo-av"
 
 type ChatScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Chat">
 
