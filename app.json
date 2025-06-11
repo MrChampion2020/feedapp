@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "",
-    "slug": "",
+    "name": "feeda",
+    "slug": "feeda",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,19 +10,21 @@
     "splash": {
       "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#00000000"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sirchampion.feeda",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+      "buildNumber": "1.0.0"
+  
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#00000000"
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.sirchampion.feeda",
@@ -40,6 +42,13 @@
       "eas": {
         "projectId": "520527fb-240d-4626-a251-c8e2bb965a38"
       }
-    }
+    },
+    "plugins": [
+      "expo-av",
+      "expo-image-picker",
+      "expo-local-authentication",
+      "expo-media-library",
+      "expo-dev-client"
+    ]
   }
 }
