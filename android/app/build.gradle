@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.sirchampion.feeda'
+    namespace 'com.sirchampion'
     defaultConfig {
-        applicationId 'com.sirchampion.feeda'
+        applicationId 'com.sirchampion'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

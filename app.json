@@ -1,54 +1,54 @@
 {
-  "expo": {
-    "name": "feeda",
-    "slug": "feeda",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000000"
-    },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.sirchampion.feeda",
-      "buildNumber": "1.0.0",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#000000"
-      },
-      "edgeToEdgeEnabled": true,
-      "package": "com.sirchampion",
-      "versionCode": 1,
-      "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO",
-        "RECORD_AUDIO"
-      ]
-    },
-    "web": {
-      "favicon": "./assets/icon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "520527fb-105d-4626-a251-c8e2bb965a38"
-      }
-    },
-    "plugins": [
-      "expo-av",
-      "expo-image-picker",
-      "expo-local-authentication",
-      "expo-media-library",
-      "expo-dev-client"
-    ]
-  }
-}
+     "expo": {
+       "name": "feeda",
+       "slug": "feeda",
+       "version": "1.0.0",
+       "orientation": "portrait",
+       "icon": "./assets/icon.png",
+       "userInterfaceStyle": "light",
+       "newArchEnabled": true,
+       "splash": {
+         "image": "./assets/splash.png",
+         "resizeMode": "contain",
+         "backgroundColor": "#000000"
+       },
+       "ios": {
+         "supportsTablet": true,
+         "bundleIdentifier": "com.sirchampion.feeda",
+         "buildNumber": "1.0.0",
+         "infoPlist": {
+           "ITSAppUsesNonExemptEncryption": false
+         }
+       },
+       "android": {
+         "adaptiveIcon": {
+           "foregroundImage": "./assets/icon.png",
+           "backgroundColor": "#000000"
+         },
+         "edgeToEdgeEnabled": true,
+         "package": "com.sirchampion.feeda",
+         "versionCode": 1,
+         "permissions": [
+           "CAMERA",
+           "READ_MEDIA_IMAGES",
+           "READ_MEDIA_VIDEO",
+           "RECORD_AUDIO"
+         ]
+       },
+       "web": {
+         "favicon": "./assets/icon.png"
+       },
+       "extra": {
+         "eas": {
+           "projectId": "520527fb-240d-4626-a251-c8e2bb965a38"
+         }
+       },
+       "plugins": [
+         "expo-av",
+         "expo-image-picker",
+         "expo-local-authentication",
+         "expo-media-library",
+         "expo-dev-client"
+       ]
+     }
+   }
