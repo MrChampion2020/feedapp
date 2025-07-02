@@ -1,97 +1,172 @@
-import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
-import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useColorScheme } from "react-native"
+import type React from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useColorScheme, StatusBar, Platform, ImageSourcePropType } from "react-native";
+// Use require instead of import for images
+const chatlight = require("../assets/images/chatlight.png");
+const chatdark = require("../assets/images/chatdark.jpg");
+// Attempt to import react-native-navigation-bar-color with fallback
+let setColor, setNavigationBarLight, setNavigationBarContrastEnforced;
+try {
+  const navigationBar = require("react-native-navigation-bar-color");
+  setColor = navigationBar.setColor || (() => {});
+  setNavigationBarLight = navigationBar.setNavigationBarLight || (() => {});
+  setNavigationBarContrastEnforced = navigationBar.setNavigationBarContrastEnforced || (() => {});
+  console.log("NavigationBar imported successfully:", typeof setColor === "function");
+} catch (e) {
+  console.error("Failed to import react-native-navigation-bar-color:", e);
+  setColor = () => {};
+  setNavigationBarLight = () => {};
+  setNavigationBarContrastEnforced = () => {};
+}
 
-type ThemeType = "light" | "dark"
+type ThemeType = "light" | "dark";
 
 interface ThemeColors {
-  primary: string
-  background: string
-  card: string
-  text: string
-  border: string
-  icon: string
-  placeholder: string
-  error: string
-  success: string
-  fill: string
-  hashtag: string
-  like: string
-  grey: string
-  overlay: string
-  secondary: string
-  link: string
-  chatbg: string
-  chatrec: string
-  lightgrey: string
-  chatcom: string
-  transparent: string
-
-  // Chat-specific colors for X-style chat room
-  chatPrimary: string
-  chatSecondary: string
-  chatBackground: string
-  chatCard: string
-  chatText: string
-  chatBorder: string
-  chatIcon: string
-  chatLink: string
+  tabbg: string;
+  primary: string;
+  background: string;
+  card: string;
+  text: string;
+  border: string;
+  icon: string;
+  placeholder: string;
+  error: string;
+  success: string;
+  fill: string;
+  hashtag: string;
+  like: string;
+  grey: string;
+  overlay: string;
+  secondary: string;
+  link: string;
+  chatbg: string;
+  chatrec: string;
+  lightgrey: string;
+  chatcom: string;
+  transparent: string;
+  chatPrimary: string;
+  chatSecondary: string;
+  chatBackground: string;
+  chatCard: string;
+  chatText: string;
+  chatBorder: string;
+  chatIcon: string;
+  chatLink: string;
+  chatBackgroundImage: ImageSourcePropType;
+  chatroom: {
+    primary: string;
+    accent: string;
+    background: string;
+    card: string;
+    text: string;
+    border: string;
+    icon: string;
+    placeholder: string;
+    senderBubble: string;
+    receiverBubble: string;
+    bubbleText: string;
+    headerText: string;
+    inputBg: string;
+    inputText: string;
+    inputBorder: string;
+    inputPlaceholder: string;
+    link: string;
+    backgroundImage: any;
+    com: string;
+    secondary: string;
+  };
+  iconBg: string;
+  iconFg: string;
+  iconBack: string;
+  iconBackBg: string;
+  iconPress: string;
+  placeholderDark: string;
+  senderBubble: string;
+  senderText: string;
+  receiverBubble: string;
+  receiverText: string;
+  replyPreview: string;
+  commentCard: string;
 }
 
 interface ThemeContextType {
-  theme: ThemeType
-  colors: ThemeColors
-  toggleTheme: () => void
-  setTheme: (theme: ThemeType) => void
+  theme: ThemeType;
+  colors: ThemeColors;
+  toggleTheme: () => void;
+  setTheme: (theme: ThemeType) => void;
 }
 
 const lightColors: ThemeColors = {
+  tabbg: "white",
   primary: "black",
-  secondary: "grey",
+  secondary: "#657786",
   background: "#FFFFFF",
-  card: "#FFFFFF",
-  text: "#14171A",
-  border: "#E1E8ED",
+  card: "white",
+  text: "#000000",
+  border: "#D3D3D3",
   icon: "#657786",
-  placeholder: "black",
+  placeholder: "#A9A9A9",
   error: "#E74C3C",
   success: "#27AE60",
-  fill: "red",
-  hashtag: "#0A84FF",
+  fill: "#FF4500",
+  hashtag: "#1DA1F2",
   like: "#E91E63",
-  grey: "grey",
-  lightgrey: "#E5E4E2",
-  overlay: "white",
-  link: "#ADD8E6",
+  grey: "#808080",
+  lightgrey: "#D3D3D3",
+  overlay: "#FFFFFF",
+  link: "#1DA1F2",
   chatbg: "#d3d3d3",
-  chatcom: "#F0FFFF",
+  chatcom: "lightgrey",
   chatrec: "#71797E",
   transparent: "transparent",
-
-
-  
-// Updated chat-specific colors for a WhatsApp/X-inspired light theme
-  chatPrimary: "#DCF8C6", // Soft teal-green for user chat bubbles, send button (WhatsApp-inspired)
-  chatSecondary: "#82939E", // Muted gray for timestamps, subtle accents
-  chatBackground: "#F7F9FA", // Off-white for a clean chat room base
-  chatCard: "#ECEFF1", // Light gray for other users' chat bubbles
-  chatText: "#2A2A2A", // Dark gray for readable text
-  chatBorder: "#D8DDE1", // Subtle gray for reply previews
-  chatIcon: "#607D8B", // Medium gray for chat icons (media buttons)
-  chatLink: "#1DA1F2" // X Blue for clickable links
-
-  // chatPrimary: "#E8F5FD", // Light Blue: User chat bubbles, send button
-  // chatSecondary: "grey", // Soft Gray: Timestamps, subtle accents
-  // chatBackground: "#FFFFFF", // White: Clean chat room base
-  // chatCard: "#F5F8FA", // Light Gray: Other users' chat bubbles
-  // chatText: "#14171A", // Dark Gray: Readable text
-  // chatBorder: "#E1E8ED", // Subtle Gray: Borders for reply previews
-  // chatIcon: "#657786", // Medium Gray: Chat icons (media buttons)
-  // chatLink: "#1DA1F2" // X Blue: Clickable links
-}
+  chatPrimary: "#E5E5EA",
+  chatSecondary: "#657786",
+  chatBackground: "#FFFFFF",
+  chatCard: "#1DA1F2",
+  chatText: "#000000",
+  chatBorder: "#D3D3D3",
+  chatIcon: "white",
+  chatLink: "#1DA1F2",
+  chatBackgroundImage: chatlight,
+  chatroom: {
+    primary: "#075E54",
+    accent: "#25D366",
+    background: "#ece5dd",
+    card: "#fff",
+    text: "black",
+    border: "#ece5dd",
+    icon: "grey",
+    placeholder: "#999",
+    senderBubble: "#fff",
+    receiverBubble: "#075E54",
+    bubbleText: "white",
+    headerText: "#fff",
+    inputBg: "#fff",
+    inputText: "#222",
+    inputBorder: "#ddd",
+    inputPlaceholder: "#999",
+    link: "#075E54",
+    backgroundImage: chatlight,
+    com: "lightgrey",
+    secondary: "black",
+  },
+  iconBg: "#000",
+  iconFg: "#fff",
+  iconBack: "#000",
+  iconBackBg: "transparent",
+  iconPress: "#D3D3D3",
+  placeholderDark: "#555",
+  senderBubble: "#DCF8C6",
+  senderText: "#000",
+  receiverBubble: "#fff",
+  receiverText: "#000",
+  replyPreview: "rgba(220, 248, 198, 0.5)",
+  commentCard: "#F7F7F7",
+};
 
 const darkColors: ThemeColors = {
+  tabbg: "black",
   primary: "#0A84FF",
   secondary: "#E5E4E2",
   background: "black",
@@ -113,228 +188,142 @@ const darkColors: ThemeColors = {
   chatcom: "grey",
   chatrec: "#71797E",
   transparent: "transparent",
+  chatPrimary: "#253341",
+  chatSecondary: "#8899A6",
+  chatBackground: "#15202B",
+  chatCard: "#192734",
+  chatText: "#D9D9D9",
+  chatBorder: "#38444C",
+  chatIcon: "#8899A6",
+  chatLink: "#1DA1F2",
+  chatBackgroundImage: chatdark,
+  chatroom: {
+    primary: "#075E54",
+    accent: "#25D366",
+    background: "#121B22",
+    card: "#1F2C34",
+    text: "#fff",
+    border: "#2A3942",
+    icon: "#25D366",
+    placeholder: "#8696A0",
+    senderBubble: "#005C4B",
+    receiverBubble: "#202C33",
+    bubbleText: "#fff",
+    headerText: "#fff",
+    inputBg: "#202C33",
+    inputText: "#fff",
+    inputBorder: "#2A3942",
+    inputPlaceholder: "#8696A0",
+    link: "#25D366",
+    backgroundImage: chatdark,
+    com: "grey",
+    secondary: "#E5E4E2",
+  },
+  iconBg: "#fff",
+  iconFg: "#000",
+  iconBack: "#fff",
+  iconBackBg: "transparent",
+  iconPress: "#222",
+  placeholderDark: "#AAA",
+  senderBubble: "#075E54",
+  senderText: "#fff",
+  receiverBubble: "#fff",
+  receiverText: "#000",
+  replyPreview: "rgba(7, 94, 84, 0.5)",
+  commentCard: "#232D36",
+};
 
-  // X-style chat-specific colors for dark theme
-  chatPrimary: "#253341", // Dark Grayish-Blue: User chat bubbles, send button
-  chatSecondary: "#8899A6", // Muted Gray: Timestamps, subtle accents
-  chatBackground: "#15202B", // Dark Gray: Sleek chat room base
-  chatCard: "#192734", // Slightly Lighter Gray: Other users' chat bubbles
-  chatText: "#D9D9D9", // Off-White: Readable text
-  chatBorder: "#38444C", // Dark Gray: Borders for reply previews
-  chatIcon: "#8899A6", // Light Gray: Chat icons (media buttons)
-  chatLink: "#1DA1F2" // X Blue: Clickable links
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext)
+  const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error("useTheme must be used within a ThemeProvider")
+    throw new Error("useTheme must be used within a ThemeProvider");
   }
-  return context
-}
+  return context;
+};
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const systemColorScheme = useColorScheme()
-  const [theme, setThemeState] = useState<ThemeType>("light")
+  const systemColorScheme = useColorScheme();
+  const [theme, setThemeState] = useState<ThemeType>("light");
 
   useEffect(() => {
     const loadTheme = async () => {
       try {
-        const savedTheme = await AsyncStorage.getItem("theme")
+        const savedTheme = await AsyncStorage.getItem("theme");
         if (savedTheme) {
-          setThemeState(savedTheme as ThemeType)
+          setThemeState(savedTheme as ThemeType);
         } else {
-          setThemeState(systemColorScheme === "dark" ? "dark" : "light")
+          setThemeState(systemColorScheme === "dark" ? "dark" : "light");
         }
       } catch (error) {
-        console.error("Error loading theme:", error)
-        setThemeState("light")
+        console.error("Error loading theme:", error);
+        setThemeState("light");
       }
-    }
-    loadTheme()
-  }, [systemColorScheme])
+    };
+    loadTheme();
+  }, [systemColorScheme]);
+
+  useEffect(() => {
+    const applyThemeToNavigationBar = async () => {
+      try {
+        if (theme === "dark") {
+          if (Platform.OS === "android") {
+            await setColor("#15202B");
+            await setNavigationBarContrastEnforced(false);
+            await setNavigationBarLight(false);
+          } else if (Platform.OS === "ios") {
+            StatusBar.setBackgroundColor("#15202B");
+            StatusBar.setBarStyle("light-content");
+          }
+        } else {
+          if (Platform.OS === "android") {
+            await setColor("#FFFFFF");
+            await setNavigationBarContrastEnforced(false);
+            await setNavigationBarLight(true);
+          } else if (Platform.OS === "ios") {
+            StatusBar.setBackgroundColor("#FFFFFF");
+            StatusBar.setBarStyle("dark-content");
+          }
+        }
+      } catch (error) {
+        console.error("Error setting navigation bar:", error);
+        console.log("NavigationBar available:", typeof setColor === "function");
+      }
+    };
+    applyThemeToNavigationBar();
+  }, [theme]);
 
   const toggleTheme = async () => {
     try {
-      const newTheme = theme === "light" ? "dark" : "light"
-      setThemeState(newTheme)
-      await AsyncStorage.setItem("theme", newTheme)
+      const newTheme = theme === "light" ? "dark" : "light";
+      setThemeState(newTheme);
+      await AsyncStorage.setItem("theme", newTheme);
     } catch (error) {
-      console.error("Error saving theme:", error)
+      console.error("Error saving theme:", error);
     }
-  }
+  };
 
   const setTheme = async (newTheme: ThemeType) => {
     try {
-      setThemeState(newTheme)
-      await AsyncStorage.setItem("theme", newTheme)
+      setThemeState(newTheme);
+      await AsyncStorage.setItem("theme", newTheme);
     } catch (error) {
-      console.error("Error saving theme:", error)
+      console.error("Error saving theme:", error);
     }
-  }
+  };
 
-  const colors = theme === "light" ? lightColors : darkColors
+  const colors = theme === "light" ? lightColors : darkColors;
 
   const contextValue: ThemeContextType = {
     theme,
     colors,
     toggleTheme,
     setTheme,
-  }
+  };
 
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
-}
+  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
+};
 
-
-
-// import type React from "react"
-// import { createContext, useContext, useState, useEffect } from "react"
-// import AsyncStorage from "@react-native-async-storage/async-storage"
-// import { useColorScheme } from "react-native"
-
-// type ThemeType = "light" | "dark"
-
-// interface ThemeColors {
-//   primary: string
-//   background: string
-//   card: string
-//   text: string
-//   border: string
-//   icon: string
-//   placeholder: string
-//   error: string
-//   success: string
-//   fill: string
-//   hashtag: string
-//   like: string
-//   grey: string
-//   overlay: string
-//   secondary: string
-//   link: string
-//   chatbg: string
-//   chatrec: string
-//   lightgrey: string
-//   chatcom: string
-
-
-// }
-
-// interface ThemeContextType {
-//   theme: ThemeType
-//   colors: ThemeColors
-//   toggleTheme: () => void
-//   setTheme: (theme: ThemeType) => void
-// }
-
-// const lightColors: ThemeColors = {
-//   primary: "black",
-//   secondary: "grey",
-//   background: "#FFFFFF",
-//   card: "#FFFFFF",
-//   text: "#14171A",
-//   border: "#E1E8ED",
-//   icon: "#657786",
-//   placeholder: "black",
-//   error: "#E74C3C",
-//   success: "#27AE60",
-//   fill: "red",
-//   hashtag: "#0A84FF",
-//   like: "#E91E63",
-//   grey: "grey",
-//   lightgrey: "#E5E4E2",
-//   overlay: "white",
-//   link: "#ADD8E6",
-//   chatbg: "#d3d3d3",
-//   chatcom: "#71797E",
-//   chatrec: "#40826D"
-// }
-
-// const darkColors: ThemeColors = {
-//   primary: "#0A84FF",
-//   secondary: "#E5E4E2",
-//   background: "black",
-//   card: "black",
-//   text: "#FFFFFF",
-//   border: "#0A84FF",
-//   icon: "lightgrey",
-//   placeholder: "black",
-//   error: "#E74C3C",
-//   success: "#27AE60",
-//   fill: "red",
-//   like: "#E91E63",
-//   hashtag: "#0A84FF",
-//   grey: "grey",
-//   lightgrey: "#E5E4E2",
-//   overlay: "black",
-//   link: "#ADD8E6",
-//   chatbg: "#36454F",
-//   chatcom: "#71797E",
-//   chatrec: "#40826D"
-// }
-
-// const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
-
-// export const useTheme = () => {
-//   const context = useContext(ThemeContext)
-//   if (!context) {
-//     throw new Error("useTheme must be used within a ThemeProvider")
-//   }
-//   return context
-// }
-
-// export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-//   const systemColorScheme = useColorScheme()
-//   const [theme, setThemeState] = useState<ThemeType>("light")
-
-//   useEffect(() => {
-//     const loadTheme = async () => {
-//       try {
-//         const savedTheme = await AsyncStorage.getItem("theme")
-//         if (savedTheme) {
-//           setThemeState(savedTheme as ThemeType)
-//         } else {
-//           // Use system theme as default
-//           setThemeState(systemColorScheme === "dark" ? "dark" : "light")
-//         }
-//       } catch (error) {
-//         console.error("Error loading theme:", error)
-//         setThemeState("light")
-//       }
-//     }
-//     loadTheme()
-//   }, [systemColorScheme])
-
-//   const toggleTheme = async () => {
-//     try {
-//       const newTheme = theme === "light" ? "dark" : "light"
-//       setThemeState(newTheme)
-//       await AsyncStorage.setItem("theme", newTheme)
-//     } catch (error) {
-//       console.error("Error saving theme:", error)
-//     }
-//   }
-
-//   const setTheme = async (newTheme: ThemeType) => {
-//     try {
-//       setThemeState(newTheme)
-//       await AsyncStorage.setItem("theme", newTheme)
-//     } catch (error) {
-//       console.error("Error saving theme:", error)
-//     }
-//   }
-
-//   const colors = theme === "light" ? lightColors : darkColors
-
-//   const contextValue: ThemeContextType = {
-//     theme,
-//     colors,
-//     toggleTheme,
-//     setTheme,
-//   }
-
-//   return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
-// }
 
 

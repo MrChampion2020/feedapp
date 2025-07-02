@@ -32,7 +32,7 @@ export const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabPress, style }) 
   ]
 
   return (
-    <Animated.View style={[styles.container, { backgroundColor: colors.card }]}>
+    <Animated.View style={[styles.container, { backgroundColor: colors.tabbg }]}>
       <View style={[styles.tabBar, { borderTopColor: "transparent" } ]}>
          
         {tabs.map((tab) => {
