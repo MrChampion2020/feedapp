@@ -5,6 +5,7 @@ import axios from "axios"
 import NetInfo from "@react-native-community/netinfo"
 
 const API_URL = "https://feeda.onrender.com/api"
+const SOCKET_URL = API_URL.replace(/\/api$/, '');
 
 // Create axios instance with better configuration
 const api = axios.create({
@@ -81,7 +82,7 @@ export const useAuth = () => {
   return context
 }
 
-export { api, API_URL }
+export { api, API_URL, SOCKET_URL }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)

@@ -1,4 +1,5 @@
 import { StatusBar } from "expo-status-bar"
+import { SafeAreaView } from "react-native"
 import React, { useState, useEffect, useRef } from "react"
 import { View, Text, AppState, type AppStateStatus } from "react-native"
 import { AuthProvider } from "./src/contexts/AuthContext"
@@ -82,23 +83,24 @@ export default function App() {
     setShowAppLock(false)
   }
 
+  // Root SafeAreaView ensures no content is clipped by system UI (status bar, home indicator, etc.)
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ErrorBoundary>
-        <ThemeProvider>
-          <AuthProvider>
-            <AppNavigator />
-            <StatusBar style="auto" />
-
-            {/* Blank screen overlay when app is in background */}
-            <BlankScreenOverlay visible={showBlankScreen} />
-
-            {/* App lock screen */}
-            <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
-          </AuthProvider>
-        </ThemeProvider>
-      </ErrorBoundary>
-    </GestureHandlerRootView>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              <AppNavigator />
+              {/* Blank screen overlay when app is in background */}
+              <BlankScreenOverlay visible={showBlankScreen} />
+              {/* App lock screen */}
+              <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
+      </GestureHandlerRootView>
+    </SafeAreaView>
   )
 }
 

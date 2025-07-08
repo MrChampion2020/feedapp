@@ -2,10 +2,9 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Vibration } from "react-native"
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Vibration, Image } from "react-native"
 import * as LocalAuthentication from "expo-local-authentication"
 import { useTheme } from "../contexts/ThemeContext"
-import FeedaLogoVariants from "./FeedaLogoVariant"
 
 interface AppLockScreenProps {
   visible: boolean
@@ -113,7 +112,7 @@ export const AppLockScreen: React.FC<AppLockScreenProps> = ({ visible, onUnlock 
       <View style={styles.content}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <FeedaLogoVariants variant="cursive" size={100} animated={true} showGradient={true} />
+          <Image source={require("../assets/images/feeda.png")} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
         </View>
 
         {/* Title */}

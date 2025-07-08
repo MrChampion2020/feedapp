@@ -177,14 +177,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               <TouchableOpacity onPress={() => console.log("Image pressed - could open full screen view")}>
                 <Image source={{ uri: item.image }} style={styles.messageImage} />
               </TouchableOpacity>
-              <Text style={[styles.messageText, { color: item.sender._id === user?.id ? "white" : colors.text }]}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                 {renderTextWithLinks(item.text || "")}
-              </Text>
+              </View>
             </>
           ) : (
-            <Text style={[styles.messageText, { color: item.sender._id === user?.id ? "white" : colors.text }]}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               {renderTextWithLinks(item.text || "")}
-            </Text>
+            </View>
           )}
 
           <Text

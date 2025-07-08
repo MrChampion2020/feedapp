@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-import { View, StyleSheet } from "react-native"
+import { View, StyleSheet, Image } from "react-native"
 import { useTheme } from "../contexts/ThemeContext"
-import FeedaLogoVariants from "./FeedaLogoVariant"
 
 interface BlankScreenOverlayProps {
   visible: boolean
@@ -17,7 +16,7 @@ export const BlankScreenOverlay: React.FC<BlankScreenOverlayProps> = ({ visible 
   return (
     <View style={[styles.overlay, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-        <FeedaLogoVariants variant="cursive" size={120} animated={true} showGradient={true} />
+        <Image source={require("../assets/images/feeda.png")} style={{ width: 120, height: 120, resizeMode: 'contain' }} />
       </View>
     </View>
   )
