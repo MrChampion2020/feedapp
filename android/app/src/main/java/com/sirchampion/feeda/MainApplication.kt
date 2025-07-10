@@ -1,4 +1,4 @@
-package com.app
+package com.sirchampion.feeda
 
 import android.app.Application
 import android.content.res.Configuration

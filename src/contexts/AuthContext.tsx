@@ -20,10 +20,8 @@ const setAuthToken = (token: string) => {
   if (token) {
     const cleanToken = token.replace("Bearer ", "")
     api.defaults.headers.common["Authorization"] = `Bearer ${cleanToken}`
-    console.log("Auth token set:", cleanToken.substring(0, 20) + "...")
   } else {
     delete api.defaults.headers.common["Authorization"]
-    console.log("Auth token cleared")
   }
 }
 
@@ -76,7 +74,6 @@ const AuthContext = createContext<AuthContextType>(defaultContextValue)
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
-    console.warn("useAuth must be used within an AuthProvider. Using default values.")
     return defaultContextValue
   }
   return context
@@ -104,14 +101,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadAuthData = async () => {
       try {
-        console.log("Loading auth data from storage...")
         const [storedUser, storedToken] = await Promise.all([
           AsyncStorage.getItem("user"),
           AsyncStorage.getItem("token"),
         ])
-
-        console.log("Stored user:", storedUser ? "Found" : "Not found")
-        console.log("Stored token:", storedToken ? "Found" : "Not found")
 
         if (storedUser && storedToken) {
           const userData = JSON.parse(storedUser)
@@ -119,32 +112,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(storedToken)
           setAuthToken(storedToken)
 
-          console.log("Auth data loaded successfully for user:", userData.username)
-
           // Test token validity with a simple request
           try {
-            console.log("Testing token validity...")
             const response = await api.get("/health")
-            console.log("Token validation successful:", response.status)
           } catch (error: any) {
-            console.log("Token validation failed:", error.response?.status, error.message)
-
             if (error.response?.status === 401 || error.response?.status === 403) {
-              console.log("Token expired or invalid, attempting refresh...")
               try {
                 await refreshTokenInternal(storedToken)
-                console.log("Token refresh successful")
               } catch (refreshError) {
-                console.log("Token refresh failed, clearing session")
                 await logout()
               }
             }
           }
-        } else {
-          console.log("No stored auth data found")
         }
       } catch (error) {
-        console.error("Error loading auth data:", error)
         await logout()
       } finally {
         setIsLoading(false)
@@ -158,29 +139,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const responseInterceptor = api.interceptors.response.use(
       (response) => {
-        console.log(
-          `API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`,
-        )
         return response
       },
       async (error) => {
-        console.error(
-          `API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`,
-        )
-
-        // Only attempt token refresh if not already refreshing and status is 401/403
         if (
           (error.response?.status === 401 || error.response?.status === 403) &&
           !isRefreshing &&
           token &&
           !error.config._retry
         ) {
-          console.log("Authentication error detected in interceptor")
           error.config._retry = true
 
           try {
             setIsRefreshing(true)
-            console.log("Attempting token refresh...")
             await refreshTokenInternal(token)
 
             // Retry the original request with new token
@@ -191,7 +162,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               return api.request(error.config)
             }
           } catch (refreshError) {
-            console.log("Token refresh failed in interceptor")
             await logout()
           } finally {
             setIsRefreshing(false)
@@ -199,9 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (error.response?.status === 401 || error.response?.status === 403) {
           // If already tried refreshing or no token, just logout
           if (isRefreshing || error.config._retry) {
-            console.log("Token refresh already attempted or in progress")
           } else {
-            console.log("No token available for refresh")
           }
           await logout()
         }
@@ -227,8 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("No internet connection")
       }
 
-      console.log("Attempting signup for:", email)
-
       const response = await api.post("/auth/signup", {
         email: email.toLowerCase().trim(),
         username: username.toLowerCase().trim(),
@@ -242,9 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData)
       await AsyncStorage.setItem("user", JSON.stringify(userData))
 
-      console.log("Signup successful:", userData)
     } catch (error: any) {
-      console.error("Signup error:", error)
       const message = error.response?.data?.message || error.message || "Signup failed"
       throw new Error(message)
     }
@@ -255,8 +219,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isConnected) {
         throw new Error("No internet connection")
       }
-
-      console.log("Attempting login for:", identifier)
 
       // First, validate credentials without completing login
       const response = await api.post("/auth/login", {
@@ -271,11 +233,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData)
       await AsyncStorage.setItem("user", JSON.stringify(userData))
 
-      console.log("Credentials validated, OTP verification required")
-
       // Note: We don't set the token here as we'll do that after OTP verification
     } catch (error: any) {
-      console.error("Login error:", error)
       const message = error.response?.data?.message || error.message || "Login failed"
       throw new Error(message)
     }
@@ -287,16 +246,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("No internet connection")
       }
 
-      console.log("Verifying OTP for:", email)
-
       const response = await api.post("/auth/verify-otp", {
         email: email.toLowerCase().trim(),
         otp: otp.trim(),
       })
 
       const { token: userToken, user: userData } = response.data
-
-      console.log("OTP verification successful, setting token")
 
       setToken(userToken)
       setAuthToken(userToken)
@@ -309,9 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       await AsyncStorage.setItem("token", userToken)
 
-      console.log("OTP verification and token setup complete")
     } catch (error: any) {
-      console.error("OTP verification error:", error)
       const message = error.response?.data?.message || error.message || "Verification failed"
       throw new Error(message)
     }
@@ -323,15 +276,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("No internet connection")
       }
 
-      console.log("Refreshing token...")
-
       // Temporarily set the current token for the refresh request
       const tempHeaders = { Authorization: `Bearer ${currentToken}` }
 
       const response = await api.post("/auth/refresh", { token: currentToken }, { headers: tempHeaders })
       const { token: newToken } = response.data
-
-      console.log("Token refresh successful")
 
       setToken(newToken)
       setAuthToken(newToken)
@@ -339,14 +288,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return newToken
     } catch (error: any) {
-      console.error("Token refresh failed:", error)
       throw error
     }
   }
 
   const refreshToken = async () => {
     if (isRefreshing) {
-      console.log("Token refresh already in progress, skipping")
       return
     }
 
@@ -358,7 +305,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsRefreshing(true)
       await refreshTokenInternal(token)
     } catch (error: any) {
-      console.error("Token refresh failed:", error)
       await logout()
       throw error
     } finally {
@@ -368,17 +314,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      console.log("Logging out...")
-
       setUser(null)
       setToken(null)
       setAuthToken("")
 
       await Promise.all([AsyncStorage.removeItem("user"), AsyncStorage.removeItem("token")])
 
-      console.log("Logout successful")
     } catch (error) {
-      console.error("Error during logout:", error)
     }
   }
 
@@ -423,10 +365,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 //   if (token) {
 //     const cleanToken = token.replace("Bearer ", "")
 //     api.defaults.headers.common["Authorization"] = `Bearer ${cleanToken}`
-//     console.log("Auth token set:", cleanToken.substring(0, 20) + "...")
 //   } else {
 //     delete api.defaults.headers.common["Authorization"]
-//     console.log("Auth token cleared")
 //   }
 // }
 
@@ -476,7 +416,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 // export const useAuth = () => {
 //   const context = useContext(AuthContext)
 //   if (!context) {
-//     console.warn("useAuth must be used within an AuthProvider. Using default values.")
 //     return defaultContextValue
 //   }
 //   return context

@@ -10,18 +10,10 @@ import {
   Share,
   RefreshControl,
   ActivityIndicator,
-  
-
-
-
-
-
-  
   Animated,
   Dimensions,
   StatusBar,
   Alert,
-  SafeAreaView,
   TextInput,
   Modal,
   KeyboardAvoidingView,
@@ -52,6 +44,7 @@ import {
 } from "lucide-react-native"
 import VerifiedBadge from "../../components/VerifiedBadge"
 import { getUserVerificationStatus } from "../../utils/userUtils"
+import { colors as appColors } from "../../constants/colors";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -210,6 +203,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
   const likeCountAnimationsRef = useRef<{ [key: string]: Animated.Value }>({})
   const likeBounceAnimationsRef = useRef<{ [key: string]: Animated.Value }>({})
   const [initializedPosts, setInitializedPosts] = useState<Set<string>>(new Set())
+  const [expandedPosts, setExpandedPosts] = useState<{ [postId: string]: boolean }>({});
 
   useEffect(() => {
     const loadSounds = async () => {
@@ -276,7 +270,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
 
   const fetchPosts = async (pageNum = 1, isRefresh = false) => {
     try {
-      console.log(`Fetching posts - Page: ${pageNum}, Refresh: ${isRefresh}`)
       if (!isConnected) {
         setError("No internet connection. Please check your network.")
         setLoading(false)
@@ -307,24 +300,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
         // Combine images and videos into media array
         const images = (post.images || []).map((url: any) => {
           if (typeof url !== "string" || !url) {
-            console.warn(`Invalid image URL in post ${post._id}:`, url)
             return null
           }
-          console.log(`Image URL for post ${post._id}: ${url}`)
           return { url, type: "image" }
         }).filter((media: Media | null) => media !== null)
         
         const videos = (post.videos || []).map((url: any) => {
           if (typeof url !== "string" || !url) {
-            console.warn(`Invalid video URL in post ${post._id}:`, url)
             return null
           }
-          console.log(`Video URL for post ${post._id}: ${url}`)
           return { url, type: "video" }
         }).filter((media: Media | null) => media !== null)
         
         const media = [...images, ...videos] as Media[]
-        console.log(`Post ${post._id} media:`, JSON.stringify(media, null, 2))
         return { ...post, media }
       })
       const newLikeAnimations: { [key: string]: Animated.Value } = {}
@@ -333,14 +321,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
       const newLikeColorAnimations: { [key: string]: Animated.Value } = {}
       transformedPosts.forEach((post: Post) => {
         const isLiked = user && post.likes.includes(user.id)
-        console.log(`🎯 fetchPosts: Post ${post._id} - isLiked: ${isLiked}, likes: ${post.likes.length}`)
         newLikeAnimations[post._id] = new Animated.Value(isLiked ? 1 : 0)
         newLikeCountAnimations[post._id] = new Animated.Value(post.likes.length)
         newLikeBounceAnimations[post._id] = new Animated.Value(1)
         newLikeColorAnimations[post._id] = new Animated.Value(isLiked ? 1 : 0)
         trackPostView(post._id)
       })
-      console.log(`📊 fetchPosts: Created ${Object.keys(newLikeColorAnimations).length} color animations`)
       setLikeAnimations((prev) => ({ ...prev, ...newLikeAnimations }))
       setLikeCountAnimations((prev) => ({ ...prev, ...newLikeCountAnimations }))
       setLikeBounceAnimations((prev) => ({ ...prev, ...newLikeBounceAnimations }))
@@ -369,6 +355,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
             const media = [...images, ...videos] as Media[]
             return { ...post, media }
           })
+          
+          // Create animations for retry posts (same logic as main fetch)
+          const newLikeAnimations: { [key: string]: Animated.Value } = {}
+          const newLikeCountAnimations: { [key: string]: Animated.Value } = {}
+          const newLikeBounceAnimations: { [key: string]: Animated.Value } = {}
+          const newLikeColorAnimations: { [key: string]: Animated.Value } = {}
+          transformedPosts.forEach((post: Post) => {
+            const isLiked = user && post.likes.includes(user.id)
+            newLikeAnimations[post._id] = new Animated.Value(isLiked ? 1 : 0)
+            newLikeCountAnimations[post._id] = new Animated.Value(post.likes.length)
+            newLikeBounceAnimations[post._id] = new Animated.Value(1)
+            newLikeColorAnimations[post._id] = new Animated.Value(isLiked ? 1 : 0)
+            trackPostView(post._id)
+          })
+          setLikeAnimations((prev) => ({ ...prev, ...newLikeAnimations }))
+          setLikeCountAnimations((prev) => ({ ...prev, ...newLikeCountAnimations }))
+          setLikeBounceAnimations((prev) => ({ ...prev, ...newLikeBounceAnimations }))
+          setLikeColorAnimations((prev) => ({ ...prev, ...newLikeColorAnimations }))
+          
           if (pageNum === 1) setPosts(transformedPosts)
           else setPosts((prev) => [...prev, ...transformedPosts])
           setHasMore(pagination?.hasNext || false)
@@ -539,10 +544,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
   }
 
   const handleCommentPress = (postId: string) => {
-    setSelectedPostId(postId)
-    setCommentModalVisible(true)
-    setTimeout(() => commentInputRef.current?.focus(), 100)
-  }
+    // Find the post object to pass to PostView
+    const post = posts.find((p) => p._id === postId);
+    navigation.navigate("PostView", { post, postId, openComment: true });
+  };
 
   const handleComment = async () => {
     if (!commentText.trim() || !user || !selectedPostId) return
@@ -707,21 +712,46 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
     const now = new Date()
     const postDate = new Date(dateString)
     const diffInSeconds = Math.floor((now.getTime() - postDate.getTime()) / 1000)
+    
     if (diffInSeconds < 60) return "now"
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`
-    return postDate.toLocaleDateString()
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)}wk`
+    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}month`
+    return `${Math.floor(diffInSeconds / 31536000)}year`
+  }
+
+  // Format numbers with K, M, B suffixes
+  const formatNumber = (num: number) => {
+    if (num >= 1000000000) {
+      return `${(num / 1000000000).toFixed(1)}B`
+    } else if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`
+    } else if (num >= 1000) {
+      return `${(num / 1000).toFixed(1)}K`
+    }
+    return num.toString()
+  }
+
+  // Get color based on count
+  const getCountColor = (count: number, baseColor: string) => {
+    if (count >= 1000) {
+      // Use different gold colors based on theme for better visibility
+      return theme === "dark" ? "#FFD700" : "#DAA520" // Light gold for dark theme, dark gold for light theme
+    }
+    return baseColor
   }
 
   const renderPostImages = (post: Post) => {
     if (!post.media || post.media.length === 0) {
       return (
         <View style={styles.imageContainer}>
-          <Text style={[styles.caption, { color: colors.text }]}>No media available</Text>
+          {/* Removed 'No media available' comment as requested */}
         </View>
       )
     }
+    
     if (post.media.length === 1) {
       return (
         <View style={styles.imageContainer}>
@@ -735,36 +765,46 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
         </View>
       )
     }
+    
+    // Multiple media - use scrollable approach
     return (
       <View style={styles.imageContainer}>
-        <View style={styles.imageGrid}>
-          {post.media.slice(0, 4).map((media, index) => {
-            const isFirstImage = index === 0
-            const isLastVisible = index === 3 && post.media.length > 4
-            let imageStyle
-            if (post.media.length === 2) {
-              imageStyle = [styles.gridImage, { width: "49%", height: 200 }]
-            } else if (post.media.length === 3) {
-              imageStyle = isFirstImage
-                ? [styles.gridImage, { width: "100%", height: 200, marginBottom: 2 }]
-                : [styles.gridImage, { width: "49%", height: 150 }]
-            } else {
-              imageStyle = [styles.gridImage, { width: "49%", height: 150 }]
-            }
-            return (
+        <FlatList
+          data={post.media}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item, index) => `${post._id}-${index}`}
+          renderItem={({ item: media, index }) => (
+            <View style={styles.scrollableMediaWrapper}>
               <MediaItem
-                key={index}
                 media={media}
                 postId={post._id}
-                style={imageStyle}
+                style={styles.scrollableMedia}
                 onPress={() => handlePostPress(post)}
-                isLastVisible={isLastVisible}
-                moreImagesCount={isLastVisible ? post.media.length - 4 : undefined}
                 isVisible={visiblePostId === post._id && index === 0} // Only first video auto-plays
               />
-            )
-          })}
-        </View>
+            </View>
+          )}
+          style={styles.scrollableMediaContainer}
+        />
+        {/* Media indicators for multiple media */}
+        {post.media.length > 1 && (
+          <View style={styles.mediaIndicators}>
+            {post.media.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.mediaIndicator,
+                  {
+                    backgroundColor: index === 0 ? colors.primary : colors.border,
+                    opacity: index === 0 ? 1 : 0.5,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        )}
       </View>
     )
   }
@@ -774,7 +814,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
     const isOwnPost = user?.id === item.user._id
     const { isVerified, isPremiumVerified } = getUserVerificationStatus(item.user._id)
     
-    // Create interpolated values for animations with safety checks
+    // Use theme-aware text color for heartColor
+    const themeTextColor = theme === 'dark' ? '#fff' : '#000';
     const heartScale = likeAnimations[item._id]?.interpolate({ 
       inputRange: [0, 0.5, 1], 
       outputRange: [1, 1.3, 1] 
@@ -786,14 +827,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
     if (!likeColorAnimations[item._id]) {
       const isLiked = user && item.likes?.includes(user.id)
       likeColorAnimations[item._id] = new Animated.Value(isLiked ? 1 : 0)
-      console.log(`🎨 Created missing color animation for post ${item._id}: ${isLiked ? 1 : 0}`)
     }
     
     // Use animated color interpolation to persist the like state
-    const heartColor = likeColorAnimations[item._id]?.interpolate({
-      inputRange: [0, 1],
-      outputRange: [colors.text, colors.like]
-    }) as any || (isLiked ? colors.like : colors.text)
+    const heartColor = isLiked ? appColors.like : themeTextColor;
+    
+    const isExpanded = expandedPosts[item._id];
+    
+    // Split caption into hashtags and non-hashtag text
+    const words = item.caption ? item.caption.split(/(\s+)/) : [];
+    const hashtags = words.filter(w => w.startsWith('#'));
+    const nonHashtagText = words.filter(w => !w.startsWith('#')).join('');
+    
     return (
       <TouchableOpacity
         style={[styles.postContainer, { backgroundColor: colors.card, borderBottomColor: colors.border, borderLeftWidth: item.isViral ? 3 : 0, borderLeftColor: item.isViral ? "#FF6B35" : "transparent" }]}
@@ -806,44 +851,74 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
           </View>
         )}
         <View style={styles.postHeader}>
-          <TouchableOpacity onPress={() => navigation.navigate("UserProfile", { userId: item.user._id })} style={styles.userInfoContainer}>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate("UserProfile", { userId: item.user._id })} 
+            style={styles.userInfoContainer}
+            activeOpacity={0.8}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+          >
             <Image source={{ uri: item.user.profilePicture || "https://via.placeholder.com/40" }} style={styles.profileImage} />
             <View style={styles.userInfo}>
               <View style={styles.userNameRow}>
-                <Text style={[styles.fullName, { color: colors.text }]}>{item.user.fullName}</Text>
-                <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={14} />
-                <Text style={[styles.username, { color: colors.text }]}>@{item.user.username}</Text>
+                <Text style={[styles.fullName, { color: colors.text, fontSize: 14, fontWeight: "500" }]}>{item.user.fullName}</Text>
+                <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} style={{ marginLeft: 2 }} />
+                <Text style={[styles.username, { color: colors.text, marginLeft: 4, fontSize: 13 }]}>@{item.user.username}</Text>
                 <Text style={[styles.timestamp, { color: colors.text }]}>·</Text>
                 <Text style={[styles.timestamp, { color: colors.text }]}>{formatTimeAgo(item.createdAt)}</Text>
               </View>
             </View>
           </TouchableOpacity>
           <View>
-            <TouchableOpacity style={styles.moreButton} onPress={() => handleMorePress(item._id)}>
+            <TouchableOpacity 
+              style={styles.moreButton} 
+              onPress={() => handleMorePress(item._id)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <MoreHorizontal size={20} color={colors.icon} />
             </TouchableOpacity>
             {activeDropdownPostId === item._id && (
               <View style={[styles.dropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {isOwnPost ? (
-                  <TouchableOpacity style={[styles.dropdownItem, { borderBottomColor: colors.border }]} onPress={() => handleDeletePost(item._id)}>
+                  <TouchableOpacity 
+                    style={[styles.dropdownItem, { borderBottomColor: colors.border }]} 
+                    onPress={() => handleDeletePost(item._id)}
+                    activeOpacity={0.7}
+                  >
                     <Trash2 size={16} color="#FF3B30" />
                     <Text style={[styles.dropdownText, { color: "#FF3B30" }]}>Delete Post</Text>
                   </TouchableOpacity>
                 ) : (
                   <>
-                    <TouchableOpacity style={[styles.dropdownItem, { borderBottomColor: colors.border }]} onPress={() => handleBlockUser(item.user._id)}>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem, { borderBottomColor: colors.border }]} 
+                      onPress={() => handleBlockUser(item.user._id)}
+                      activeOpacity={0.7}
+                    >
                       <UserX size={16} color={colors.text} />
                       <Text style={[styles.dropdownText, { color: colors.text }]}>Block User</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.dropdownItem, { borderBottomColor: colors.border }]} onPress={() => handleBlockPost(item._id)}>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem, { borderBottomColor: colors.border }]} 
+                      onPress={() => handleBlockPost(item._id)}
+                      activeOpacity={0.7}
+                    >
                       <Ban size={16} color={colors.text} />
                       <Text style={[styles.dropdownText, { color: colors.text }]}>Hide Post</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.dropdownItem, { borderBottomColor: colors.border }]} onPress={() => handleFollowUser(item.user._id)}>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem, { borderBottomColor: colors.border }]} 
+                      onPress={() => handleFollowUser(item.user._id)}
+                      activeOpacity={0.7}
+                    >
                       <UserPlus size={16} color={colors.text} />
                       <Text style={[styles.dropdownText, { color: colors.text }]}>Follow User</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.dropdownItem]} onPress={() => handleOpenChat(item.user._id)}>
+                    <TouchableOpacity 
+                      style={[styles.dropdownItem]} 
+                      onPress={() => handleOpenChat(item.user._id)}
+                      activeOpacity={0.7}
+                    >
                       <MessageSquarePlus size={16} color={colors.text} />
                       <Text style={[styles.dropdownText, { color: colors.text }]}>Message</Text>
                     </TouchableOpacity>
@@ -855,52 +930,109 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
         </View>
         {item.caption && (
           <View style={styles.captionContainer}>
-            <Text style={[styles.caption, { color: colors.text }]}>
-              {item.caption.split(/(\s+)/).map((word, index) =>
-                word.startsWith("#") ? (
-                  <Text key={index} style={[styles.hashtag, { color: colors.hashtag }]} onPress={() => handleHashtagPress(word.substring(1))}>
+            {/* Non-hashtag text, limited to 5 lines unless expanded */}
+            <Text
+              style={[
+                styles.caption,
+                { color: colors.text, fontSize: 14, fontWeight: "400", lineHeight: 20 },
+              ]}
+              numberOfLines={isExpanded ? undefined : 5}
+              ellipsizeMode="tail"
+            >
+              {nonHashtagText}
+            </Text>
+            {/* Show all hashtags always, below the text */}
+            {hashtags.length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+                {hashtags.map((word, index) => (
+                  <Text
+                    key={index}
+                    style={[
+                      styles.hashtag,
+                      { color: colors.hashtag, fontSize: 14, fontWeight: "400", marginRight: 6 },
+                    ]}
+                    onPress={() => handleHashtagPress(word.substring(1))}
+                  >
                     {word}
                   </Text>
-                ) : (
-                  <Text key={index} style={{ color: colors.text }}>{word}</Text>
-                )
-              )}
-            </Text>
+                ))}
+              </View>
+            )}
+            {/* Show more/less link */}
+            {!isExpanded && nonHashtagText.length > 120 && (
+              <Text
+                style={{ color: colors.primary, fontSize: 13, fontWeight: "500", marginTop: 2 }}
+                onPress={() => setExpandedPosts((prev) => ({ ...prev, [item._id]: true }))}
+              >
+                Show more
+              </Text>
+            )}
+            {isExpanded && nonHashtagText.length > 120 && (
+              <Text
+                style={{ color: colors.primary, fontSize: 13, fontWeight: "500", marginTop: 2 }}
+                onPress={() => setExpandedPosts((prev) => ({ ...prev, [item._id]: false }))}
+              >
+                Show less
+              </Text>
+            )}
           </View>
         )}
         {renderPostImages(item)}
         <View style={styles.actionsContainer}>
           <View style={styles.actionButtons}>
-            <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleCommentPress(item._id) }} style={styles.actionButton}>
-              <MessageCircle size={20} color={colors.icon} />
-              <Text style={[styles.actionCount, { color: colors.text }]}>{item.comments?.length || 0}</Text>
+            <TouchableOpacity 
+              onPress={(e) => { e.stopPropagation(); handleCommentPress(item._id) }} 
+              style={styles.actionButton}
+              activeOpacity={0.7}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              <MessageCircle size={20} color={getCountColor(item.comments?.length || 0, colors.icon)} />
+              <Text style={[styles.actionCount, { color: getCountColor(item.comments?.length || 0, colors.text) }]}>
+                {formatNumber(item.comments?.length || 0)}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleLike(item._id) }} style={styles.actionButton}>
+            <TouchableOpacity 
+              onPress={(e) => { e.stopPropagation(); handleLike(item._id) }} 
+              style={styles.actionButton}
+              activeOpacity={0.7}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
               <Animated.View style={{ 
                 transform: [
                   { scale: heartScale && heartBounce ? Animated.multiply(heartScale, heartBounce) : 1 }
                 ] 
               }}>
-                <Heart size={20} color={isLiked ? colors.like : colors.text} fill={isLiked ? colors.like : "transparent"} />
+                <Heart 
+                  size={20} 
+                  color={heartColor} 
+                  fill={isLiked ? appColors.like : "transparent"} 
+                />
               </Animated.View>
               <Animated.Text style={[
                 styles.actionCount, 
                 { 
-                  color: isLiked ? colors.like : colors.text, 
+                  color: isLiked ? appColors.like : colors.text,
                   opacity: isLiked ? 1 : 0.6,
                   transform: [{ scale: isLiked ? 1.1 : 1 }] 
                 }
               ]}>
-                {item.likes?.length || 0}
+                {formatNumber(item.likes?.length || 0)}
               </Animated.Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleShare(item) }} style={styles.actionButton}>
+            <TouchableOpacity 
+              onPress={(e) => { e.stopPropagation(); handleShare(item) }} 
+              style={styles.actionButton}
+              activeOpacity={0.7}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
               <ShareIcon size={20} color={colors.icon} />
             </TouchableOpacity>
           </View>
           <View style={styles.viewsContainer}>
-            <Eye size={16} color={colors.text} />
-            <Text style={[styles.viewsText, { color: colors.text }]}>{item.views || 0}</Text>
+            <Eye size={16} color={getCountColor(item.views || 0, colors.text)} />
+            <Text style={[styles.viewsText, { color: getCountColor(item.views || 0, colors.text) }]}>
+              {formatNumber(item.views || 0)}
+            </Text>
             {item.viralScore && (
               <Text style={[styles.viralScore, { color: "#FF6B35" }]}>
                 <Text style={{ color: colors.text }}>•</Text> {item.viralScore}🔥
@@ -913,7 +1045,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
   }
 
   const renderHeader = () => (
-    <SafeAreaView style={[styles.headerSafeArea, { backgroundColor: colors.background }]}>
+    <View style={[styles.headerSafeArea, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.headerContent}>
@@ -921,10 +1053,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
             Feeda
           </Text>
           <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate("Search")}>
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              onPress={() => navigation.navigate("Search")}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Search size={24} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate("Notifications")}>
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              onPress={() => navigation.navigate("Notifications")}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Bell size={24} color={colors.text} />
               {unreadNotifications > 0 && (
                 <View style={[styles.badge, { backgroundColor: "#E91E63" }]}>
@@ -932,7 +1074,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate("Chat")}>
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              onPress={() => navigation.navigate("Chat")}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <MessageSquare size={24} color={colors.text} />
               {unreadMessages > 0 && (
                 <View style={[styles.badge, { backgroundColor: "#E91E63" }]}>
@@ -943,7 +1090,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
           </View>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   )
 
   const renderFooter = () => (loadingMore ? (
@@ -981,7 +1128,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
       <FlatList
         data={posts}
         renderItem={renderPost}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) => `home-${item._id}-${index}`}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} tintColor={colors.primary} progressBackgroundColor={colors.card} />}
         onEndReached={handleLoadMore}
@@ -1007,7 +1154,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
           <View style={[styles.commentModal, { backgroundColor: colors.card }]}>
             <View style={styles.commentModalHeader}>
               <Text style={[styles.commentModalTitle, { color: colors.text }]}>Add Comment</Text>
-              <TouchableOpacity onPress={() => { setCommentModalVisible(false); setSelectedPostId(null); setCommentText("") }} style={styles.closeButton}>
+              <TouchableOpacity 
+                onPress={() => { setCommentModalVisible(false); setSelectedPostId(null); setCommentText("") }} 
+                style={styles.closeButton}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <X size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -1026,7 +1178,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
               />
             </View>
             <View style={styles.commentModalActions}>
-              <TouchableOpacity onPress={handleComment} style={[styles.postCommentButton, { backgroundColor: commentText.trim() ? colors.primary : colors.border }]} disabled={!commentText.trim() || commentLoading}>
+              <TouchableOpacity 
+                onPress={handleComment} 
+                style={[styles.postCommentButton, { backgroundColor: commentText.trim() ? colors.primary : colors.border }]} 
+                disabled={!commentText.trim() || commentLoading}
+                activeOpacity={0.8}
+              >
                 {commentLoading ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.postCommentButtonText}>Refeed</Text>}
               </TouchableOpacity>
             </View>
@@ -1040,8 +1197,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginBottom: 30,
-    paddingTop: 10,
+    paddingTop: 2,
   },
   headerSafeArea: {
     zIndex: 1000,
@@ -1065,7 +1221,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   headerTitle: {
-    marginTop: 9,
+    marginTop: 2,
     fontWeight: "bold",
     letterSpacing: 0.5,
   },
@@ -1159,6 +1315,7 @@ const styles = StyleSheet.create({
   },
   username: {
     fontSize: 14,
+    marginLeft: 8,
     marginRight: 4,
   },
   timestamp: {
@@ -1212,12 +1369,12 @@ const styles = StyleSheet.create({
 
   },
   mediaContainer: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
-    borderRadius: 5
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    borderRadius: 5,
   },
   postImage: {
     width: "100%",
@@ -1234,11 +1391,40 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     overflow: "hidden",
   },
-  fullImage: {
+  // Scrollable media styles
+  scrollableMediaContainer: {
+    width: screenWidth - 30 - 50,
+    height: 300,
+  },
+  scrollableMediaWrapper: {
+    width: screenWidth - 30 - 50,
+    height: 300,
+  },
+  scrollableMedia: {
     width: "100%",
     height: "100%",
-    borderRadius: 5
-
+    borderRadius: 8,
+  },
+  mediaIndicators: {
+    position: "absolute",
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  mediaIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 5,
+    backgroundColor: '#000',
   },
   moreImagesOverlay: {
     ...StyleSheet.absoluteFillObject,

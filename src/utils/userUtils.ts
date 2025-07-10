@@ -2,7 +2,7 @@
 
 /**
  * Get user verification status based on user ID
- * First 1000 users get verified badge, others get premium verified badge
+ * TEMPORARY: All users get verified badge for testing
  */
 export const getUserVerificationStatus = (userId: string) => {
   if (!userId) {
@@ -12,29 +12,9 @@ export const getUserVerificationStatus = (userId: string) => {
     }
   }
 
-  // Extract numeric part from MongoDB ObjectId or use hash for consistent assignment
-  const userIdHash = hashUserId(userId)
-  const userNumber = userIdHash % 10000 // Use modulo to create a range
-
-  // First 1000 users (0-999) get verified badge
-  if (userNumber < 1000) {
-    return {
-      isVerified: true,
-      isPremiumVerified: false,
-    }
-  }
-
-  // Users 1000-2000 get premium verified badge
-  if (userNumber < 2000) {
-    return {
-      isVerified: false,
-      isPremiumVerified: true,
-    }
-  }
-
-  // Others get no badge
+  // TEMPORARY: Make all users verified for testing
   return {
-    isVerified: false,
+    isVerified: true,
     isPremiumVerified: false,
   }
 }
@@ -77,4 +57,29 @@ export const getVerificationBadgeType = (userId: string): "verified" | "premium"
   if (isPremiumVerified) return "premium"
   if (isVerified) return "verified"
   return "none"
+}
+
+/**
+ * Test function to debug verification system
+ * Call this in your app to see what's happening
+ */
+export const testVerificationSystem = () => {
+  // Test with different user IDs
+  const testUserIds = [
+    "507f1f77bcf86cd799439011", // MongoDB ObjectId format
+    "507f1f77bcf86cd799439012",
+    "507f1f77bcf86cd799439013",
+    "507f1f77bcf86cd799439014",
+    "507f1f77bcf86cd799439015",
+    "user123", // Simple string
+    "user456",
+    "user789",
+    "testuser1",
+    "testuser2"
+  ]
+  
+  testUserIds.forEach((userId, index) => {
+    const { isVerified, isPremiumVerified } = getUserVerificationStatus(userId)
+    const badgeType = getVerificationBadgeType(userId)
+  })
 }

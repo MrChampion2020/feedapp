@@ -13,6 +13,8 @@ import {
 } from "react-native"
 import { useAuth, api } from "../../contexts/AuthContext"
 import { useTheme } from "../../contexts/ThemeContext"
+import VerifiedBadge from "../../components/VerifiedBadge"
+import { getUserVerificationStatus } from "../../utils/userUtils"
 import { useFocusEffect } from "@react-navigation/native"
 import { ArrowLeft, Heart, MessageCircle, UserPlus, Mail, LogIn, Gift } from "lucide-react-native"
 
@@ -70,7 +72,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ navigation }) =
       setHasMore(pagination?.hasNext || false)
       setPage(pageNum)
     } catch (error) {
-      console.error("Error fetching notifications:", error)
+      // console.error("Error fetching notifications:", error)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -105,7 +107,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ navigation }) =
         ),
       )
     } catch (error) {
-      console.error("Error marking notification as read:", error)
+      // console.error("Error marking notification as read:", error)
     }
   }
 
@@ -114,7 +116,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ navigation }) =
       await api.put("/notifications/read-all")
       setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
     } catch (error) {
-      console.error("Error marking all notifications as read:", error)
+      // console.error("Error marking all notifications as read:", error)
     }
   }
 
@@ -163,15 +165,16 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ navigation }) =
 
   const formatTimeAgo = (dateString: string) => {
     const now = new Date()
-    const notificationDate = new Date(dateString)
-    const diffInSeconds = Math.floor((now.getTime() - notificationDate.getTime()) / 1000)
+    const date = new Date(dateString)
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
     if (diffInSeconds < 60) return "now"
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`
-
-    return notificationDate.toLocaleDateString()
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)}wk`
+    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}month`
+    return `${Math.floor(diffInSeconds / 31536000)}year`
   }
 
   const renderNotification = ({ item }: { item: Notification }) => {
@@ -200,6 +203,13 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ navigation }) =
               />
             )}
             <View style={styles.notificationText}>
+              <View style={styles.notificationSenderRow}>
+                <Text style={[styles.senderName, { color: colors.text }]}>{item.sender?.fullName || item.sender?.username}</Text>
+                {(() => {
+                  const { isVerified, isPremiumVerified } = getUserVerificationStatus(item.sender?._id || "")
+                  return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                })()}
+              </View>
               <Text style={[styles.notificationMessage, { color: colors.text }]}>{item.message}</Text>
               <Text style={[styles.notificationTime, { color: colors.text }]}>
                 {formatTimeAgo(item.createdAt)}
@@ -349,6 +359,17 @@ const styles = StyleSheet.create({
   },
   notificationText: {
     flex: 1,
+  },
+  notificationSenderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 2,
+  },
+  senderName: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginRight: 4,
   },
   notificationMessage: {
     fontSize: 14,

@@ -1,7 +1,7 @@
 import { StatusBar } from "expo-status-bar"
-import { SafeAreaView } from "react-native"
+import { View } from "react-native"
 import React, { useState, useEffect, useRef } from "react"
-import { View, Text, AppState, type AppStateStatus } from "react-native"
+import { View as RNView, Text, AppState, type AppStateStatus, Platform } from "react-native"
 import { AuthProvider } from "./src/contexts/AuthContext"
 import { ThemeProvider } from "./src/contexts/ThemeContext"
 import AppNavigator from "./src/navigation/index"
@@ -9,6 +9,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { BlankScreenOverlay } from "./src/components/BlankScreen"
 import { AppLockScreen } from "./src/components/LockScreen"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -28,7 +30,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+        <RNView style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
           <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>Something went wrong</Text>
           <Text style={{ textAlign: "center", marginBottom: 20 }}>
             {this.state.error?.message || "An unexpected error occurred"}
@@ -39,7 +41,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
           >
             Try Again
           </Text>
-        </View>
+        </RNView>
       )
     }
 
@@ -83,24 +85,28 @@ export default function App() {
     setShowAppLock(false)
   }
 
-  // Root SafeAreaView ensures no content is clipped by system UI (status bar, home indicator, etc.)
+  // Use View instead of SafeAreaView to prevent layout recalculation issues
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <ErrorBoundary>
-          <ThemeProvider>
-            <AuthProvider>
-              <AppNavigator />
-              {/* Blank screen overlay when app is in background */}
-              <BlankScreenOverlay visible={showBlankScreen} />
-              {/* App lock screen */}
-              <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
-            </AuthProvider>
-          </ThemeProvider>
-        </ErrorBoundary>
-      </GestureHandlerRootView>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <StatusBar style="dark" />
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <ErrorBoundary>
+            <ThemeProvider>
+              <AuthProvider>
+                <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                  <AppNavigator />
+                </SafeAreaView>
+                {/* Blank screen overlay when app is in background */}
+                <BlankScreenOverlay visible={showBlankScreen} />
+                {/* App lock screen */}
+                <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
+              </AuthProvider>
+            </ThemeProvider>
+          </ErrorBoundary>
+        </GestureHandlerRootView>
+      </View>
+    </SafeAreaProvider>
   )
 }
 

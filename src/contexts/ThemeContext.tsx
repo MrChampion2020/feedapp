@@ -12,9 +12,7 @@ try {
   setColor = navigationBar.setColor || (() => {});
   setNavigationBarLight = navigationBar.setNavigationBarLight || (() => {});
   setNavigationBarContrastEnforced = navigationBar.setNavigationBarContrastEnforced || (() => {});
-  console.log("NavigationBar imported successfully:", typeof setColor === "function");
 } catch (e) {
-  console.error("Failed to import react-native-navigation-bar-color:", e);
   setColor = () => {};
   setNavigationBarLight = () => {};
   setNavigationBarContrastEnforced = () => {};
@@ -174,7 +172,7 @@ const darkColors: ThemeColors = {
   text: "#FFFFFF",
   border: "#0A84FF",
   icon: "lightgrey",
-  placeholder: "black",
+  placeholder: "#FFFFFF",
   error: "#E74C3C",
   success: "#27AE60",
   fill: "red",
@@ -257,7 +255,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setThemeState(systemColorScheme === "dark" ? "dark" : "light");
         }
       } catch (error) {
-        console.error("Error loading theme:", error);
         setThemeState("light");
       }
     };
@@ -287,7 +284,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
         }
       } catch (error) {
-        console.error("Error setting navigation bar:", error);
         console.log("NavigationBar available:", typeof setColor === "function");
       }
     };
@@ -300,7 +296,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setThemeState(newTheme);
       await AsyncStorage.setItem("theme", newTheme);
     } catch (error) {
-      console.error("Error saving theme:", error);
     }
   };
 
@@ -309,7 +304,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setThemeState(newTheme);
       await AsyncStorage.setItem("theme", newTheme);
     } catch (error) {
-      console.error("Error saving theme:", error);
     }
   };
 

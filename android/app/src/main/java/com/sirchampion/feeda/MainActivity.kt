@@ -1,4 +1,4 @@
-package com.app
+package com.sirchampion.feeda
 
 import android.os.Build
 import android.os.Bundle

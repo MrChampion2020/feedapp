@@ -5,6 +5,7 @@ export const colors = {
   lightgrey: "#F5F5F5", // Off-white for subtle backgrounds
   black: "#000000", // Pure black for text and accents
   white: "#FFFFFF", // Pure white for backgrounds
+  like: "#E91E63", // Consistent like color for liked heart icon
   text: {
     primary: "#000000", // Black for primary text
     secondary: "#666666", // Dark grey for secondary text

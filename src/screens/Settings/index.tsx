@@ -23,6 +23,8 @@ import Icon from "react-native-vector-icons/Ionicons"
 import type { SettingsStackParamList } from "../../types/navigation"
 import { useAuth, api } from "../../contexts/AuthContext"
 import { useTheme } from "../../contexts/ThemeContext"
+import VerifiedBadge from "../../components/VerifiedBadge"
+import { getUserVerificationStatus } from "../../utils/userUtils"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as LocalAuthentication from "expo-local-authentication"
 
@@ -93,7 +95,7 @@ const SettingsScreen = () => {
       const enabled = await AsyncStorage.getItem("appLockEnabled")
       setAppLockEnabled(enabled === "true")
     } catch (error) {
-      console.log("Error loading app lock settings:", error)
+      // console.log("Error loading app lock settings:", error)
     }
   }
 
@@ -116,7 +118,7 @@ const SettingsScreen = () => {
         setAuthType("Device Authentication")
       }
     } catch (error) {
-      console.log("Error checking biometric availability:", error)
+      // console.log("Error checking biometric availability:", error)
     }
   }
 
@@ -175,7 +177,7 @@ const SettingsScreen = () => {
         setEditedProfile(response.data.user)
       }
     } catch (error) {
-      console.error("Error fetching profile:", error)
+      // console.error("Error fetching profile:", error)
       Alert.alert("Error", "Failed to load profile")
     } finally {
       setLoading(false)
@@ -200,7 +202,7 @@ const SettingsScreen = () => {
         Alert.alert("Success", "Profile updated successfully!")
       }
     } catch (error) {
-      console.error("Error updating profile:", error)
+      // console.error("Error updating profile:", error)
       Alert.alert("Error", "Failed to update profile")
     }
   }
@@ -372,7 +374,13 @@ const SettingsScreen = () => {
             </View>
 
             <View style={styles.profileRightSection}>
-              <Text style={[styles.profileName, { color: "#FFFFFF" }]}>{profile?.fullName || "User"}</Text>
+              <View style={styles.profileNameRow}>
+                <Text style={[styles.profileName, { color: "#FFFFFF" }]}>{profile?.fullName || "User"}</Text>
+                {(() => {
+                  const { isVerified, isPremiumVerified } = getUserVerificationStatus(profile?.id || "")
+                  return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={16} />
+                })()}
+              </View>
               <Text style={[styles.usernameText, { color: "#FFFFFF" }]}>@{profile?.username}</Text>
               <View style={[styles.contactCard, { backgroundColor: themeColors.card }]}>
                 <View style={styles.contactInfo}>
@@ -654,6 +662,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 2,
     borderColor: "white",
+  },
+  profileNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
   profileName: {
     fontSize: 20,

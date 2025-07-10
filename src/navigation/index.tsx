@@ -111,9 +111,6 @@ function TabNavigator() {
               currentRouteName = nestedRoute.name === "HomeTab" ? "Home" : nestedRoute.name
             }
 
-            // Debug log to verify route detection (remove after debugging)
-            console.log("Current Route:", currentRouteName, "State:", JSON.stringify(state))
-
             setActiveTab(currentRouteName)
             handleTabBarVisibilityChange(true, currentRouteName)
           },

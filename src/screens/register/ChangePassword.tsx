@@ -50,20 +50,14 @@ const ChangePassword: React.FC = () => {
   }, [timeLeft, currentStep]);
 
   const handleCodeComplete = (code: string) => {
-    console.log('Code entered:', code);
     setVerificationCode(code);
   };
 
   const handleEmailSubmit = (values: { email: string }) => {
-    console.log('Email submitted:', values);
     setCurrentStep('code');
   };
 
   const handlePasswordSubmit = (values: { newPassword: string; confirmPassword: string }) => {
-    console.log('Password reset data:', {
-      ...values,
-      verificationCode,
-    });
     navigation.navigate('Login');
   };
 

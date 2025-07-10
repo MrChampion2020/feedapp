@@ -4,24 +4,29 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   FlatList,
   TextInput,
+  Image,
+  Alert,
+  Modal,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Image,
-  Alert,
-  Animated,
   Dimensions,
-  Modal,
-  ImageBackground,
-  TouchableWithoutFeedback,
-  useColorScheme,
-  Easing,
+  StatusBar,
+  Share,
   Clipboard,
-  ToastAndroid,
+  Animated,
+  TouchableWithoutFeedback,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+  useColorScheme,
   Keyboard,
+  Easing,
+  AppState,
+  ToastAndroid,
+  ImageBackground
 } from "react-native";
 import { PanGestureHandler, State, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
@@ -60,6 +65,8 @@ import { Audio, Video, ResizeMode } from "expo-av";
 import { Linking } from "react-native";
 import io, { Socket } from "socket.io-client";
 import { api, API_URL } from '../../contexts/AuthContext';
+import VerifiedBadge from "../../components/VerifiedBadge";
+import { getUserVerificationStatus } from "../../utils/userUtils";
 
 type ChatScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Chat">;
 
@@ -428,6 +435,8 @@ const MessageItem = ({
                     <TouchableOpacity
                       onPress={() => { setModalImageIndex(index); setShowImageModal(true); }}
                       style={{ flex: 1, margin: 2 }}
+                      activeOpacity={0.8}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                     >
                       <Image source={{ uri: img }} style={[styles.messageImage as any, { aspectRatio: 1, width: 120 }]} />
                     </TouchableOpacity>
@@ -437,7 +446,11 @@ const MessageItem = ({
                 scrollEnabled={false}
               />
             ) : images.length === 1 && images[0] ? (
-              <TouchableOpacity onPress={() => { setModalImageIndex(0); setShowImageModal(true); }}>
+              <TouchableOpacity 
+                onPress={() => { setModalImageIndex(0); setShowImageModal(true); }}
+                activeOpacity={0.8}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
                 <Image source={{ uri: images[0] }} style={styles.messageImage as any} />
               </TouchableOpacity>
             ) : null}
@@ -455,7 +468,11 @@ const MessageItem = ({
 
             {/* Video Display */}
             {item.messageType === "video" && videoUri ? (
-              <TouchableOpacity onPress={() => setShowVideoModal(true)}>
+              <TouchableOpacity 
+                onPress={() => setShowVideoModal(true)}
+                activeOpacity={0.8}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
                 <View style={{ position: "relative" }}>
                   <Video
                     source={{ uri: videoUri }}
@@ -490,7 +507,12 @@ const MessageItem = ({
 
             {/* Audio, text, and other message types remain unchanged below */}
             {item.messageType === "audio" && audioUri ? (
-              <TouchableOpacity onPress={() => playAudio(audioUri)} style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity 
+                onPress={() => playAudio(audioUri)} 
+                style={{ flexDirection: "row", alignItems: "center" }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
                 <VoiceNoteWaveform 
                   isPlaying={isPlaying} 
                   color={colors.chatroom.primary} 
@@ -504,7 +526,12 @@ const MessageItem = ({
             ) : null}
             {item.messageType === "text-audio" && item.audio && item.text ? (
               <>
-                <TouchableOpacity onPress={() => item.audio && playAudio(item.audio)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <TouchableOpacity 
+                  onPress={() => item.audio && playAudio(item.audio)} 
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                >
                   <VoiceNoteWaveform 
                     isPlaying={isPlaying} 
                     color={isSender ? colors.senderText : colors.receiverText} 
@@ -522,7 +549,10 @@ const MessageItem = ({
             ) : null}
             {item.messageType === "text-image" && item.image && item.text ? (
               <>
-                <TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                >
                   <Image source={{ uri: item.image }} style={styles.messageImage as any} />
                 </TouchableOpacity>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -555,6 +585,16 @@ const MessageItem = ({
               justifyContent: isSender ? 'flex-end' : 'flex-start',
               marginTop: 4
             }}>
+              {isSender && (() => {
+                const status = getMessageTick(item);
+                let tickColor = isSender ? colors.senderText : '#999';
+                if (status === "✓✓" && messageStatus[item.id] === "read") {
+                  tickColor = '#25D366'; // green double tick for read
+                }
+                return (
+                  <Text style={[styles.timestamp, { color: tickColor, marginRight: 4, fontSize: 11 }]}>{status}</Text>
+                );
+              })()}
               <Text style={[styles.timestamp, { 
                 color: isSender ? colors.senderText : colors.receiverText,
                 opacity: 0.7,
@@ -562,17 +602,6 @@ const MessageItem = ({
               }]}> 
                 {item.timestamp}
               </Text>
-              {isSender && (() => {
-                const status = getMessageTick(item);
-                if (status === "✓✓" && messageStatus[item.id] === "read") {
-                  return <Text style={[styles.timestamp, { color: '#25D366', marginLeft: 4, fontSize: 11 }]}>{status}</Text>; // green double tick
-                } else if (status === "✓✓") {
-                  return <Text style={[styles.timestamp, { color: isSender ? colors.senderText : '#999', marginLeft: 4, fontSize: 11, opacity: 0.7 }]}>{status}</Text>; // grey double tick
-                } else if (status === "✓") {
-                  return <Text style={[styles.timestamp, { color: isSender ? colors.senderText : '#999', marginLeft: 4, fontSize: 11, opacity: 0.7 }]}>{status}</Text>; // grey single tick
-                }
-                return null;
-              })()}
             </View>
           </View>
         </TouchableOpacity>
@@ -644,7 +673,7 @@ const DateSeparator = ({ date, colors, isUnread = false }: { date: string; color
         fontWeight: isUnread ? 'bold' : '500'
       }
     ]}>
-      {isUnread ? '📬 Unread Messages' : date}
+      {date ? String(date) : ''}
     </Text>
     <View style={[styles.dateLine, { backgroundColor: isUnread ? colors.primary : colors.chatroom.border }]} />
   </View>
@@ -736,6 +765,69 @@ const ChatScreen = () => {
       keyboardWillHideListener?.remove();
     };
   }, []);
+
+  // --- App State Handling ---
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        // App has come to foreground - reset any height adjustments
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        
+        // Force layout recalculation
+        setTimeout(() => {
+          // Force a re-render by updating a state
+          setKeyboardHeight(prev => prev);
+          
+          // Ensure FlatList is properly positioned
+          if (activeChat && flatListRef.current) {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }
+          
+          // Additional delay for layout stabilization
+          setTimeout(() => {
+            if (activeChat && flatListRef.current) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }, 200);
+        }, 100);
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // App is going to background - clear keyboard state
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [activeChat]);
+
+
+
+  // --- Layout Stabilization ---
+  useEffect(() => {
+    // Force layout recalculation when activeChat changes
+    if (activeChat) {
+      const timer = setTimeout(() => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        
+        // Ensure proper scroll position
+        if (flatListRef.current) {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [activeChat]);
+
+  // --- Retry Mechanism ---
+  const retryFetchChats = () => {
+    console.log("Retrying fetch chats...");
+    setError(null); // Clear any existing error before retrying
+    fetchChats();
+  };
 
   // --- Media Pickers and Recording ---
   const handleImagePicker = async () => {
@@ -1127,6 +1219,18 @@ const ChatScreen = () => {
     if (token) fetchChats();
   }, [token]);
 
+  // --- Initial Data Loading ---
+  useEffect(() => {
+    if (user && token) {
+      // Add a small delay to ensure the component is fully mounted
+      const timer = setTimeout(() => {
+        fetchChats();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, token]);
+
   useEffect(() => {
     if (!activeChat || !token) return;
     fetchMessages(activeChat.id);
@@ -1134,26 +1238,83 @@ const ChatScreen = () => {
   }, [activeChat, token]);
 
   const fetchChats = async () => {
-    if (!token) return;
+    if (!token) {
+      setError("Authentication required. Please log in again.");
+      return;
+    }
+    
     setLoading(true);
+    setError(null);
+    
     try {
-      const response = await api.get("/chats");
+      console.log("Fetching chats...");
+      
+      // Add timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+      
+      const fetchPromise = api.get("/chats");
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      
+      console.log("Chats response:", response.status);
+      
       const { chats: chatData } = response.data;
+      if (!Array.isArray(chatData)) {
+        console.error("Invalid chat data format:", chatData);
+        setError("Invalid data format received from server");
+        return;
+      }
+      
+      // Handle case where user has no chats yet
+      if (chatData.length === 0) {
+        console.log("User has no chats yet");
+        setChats([]);
+        setError(null);
+        return;
+      }
+      
       const sortedChats = chatData
         .map((chat: ChatItem) => ({
           id: chat.id,
           name: chat.name,
           fullName: chat.fullName,
-          lastMessage: chat.lastMessage,
-          lastMessageTime: chat.lastMessageTime,
-          unreadCount: chat.unreadCount,
+          lastMessage: chat.lastMessage || "No messages yet",
+          lastMessageTime: chat.lastMessageTime || new Date().toISOString(),
+          unreadCount: chat.unreadCount || 0,
           avatar: chat.avatar || getEmojiFromName(chat.name),
         }))
         .sort((a: any, b: any) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+      
+      console.log("Processed chats:", sortedChats.length);
       setChats(sortedChats);
       setError(null);
     } catch (error: any) {
-      setError(error.response?.data?.message || "Failed to fetch chats");
+      console.error("Fetch chats error:", error);
+      let errorMessage = "Failed to fetch chats";
+      
+      if (error.message === 'Request timeout') {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      } else if (error.response) {
+        // Server responded with error status
+        if (error.response.status === 401) {
+          errorMessage = "Session expired. Please log in again.";
+        } else if (error.response.status === 403) {
+          errorMessage = "Access denied. Please check your permissions.";
+        } else if (error.response.status >= 500) {
+          errorMessage = "Server error. Please try again later.";
+        } else {
+          errorMessage = error.response.data?.message || `Server error (${error.response.status})`;
+        }
+      } else if (error.request) {
+        // Network error
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else {
+        // Other error
+        errorMessage = error.message || "Unknown error occurred";
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -1520,94 +1681,166 @@ const ChatScreen = () => {
       }
     });
     
-    return <Text style={{ color: textColor }}>{elements}</Text>;
+    // Return the elements directly instead of wrapping them in another Text component
+    return <>{elements}</>;
   };
 
   // --- Input Row Logic ---
   const renderInputRow = () => {
-    if (isRecording) {
-      return (
-        <View style={[styles.inputRow, { justifyContent: "space-between", alignItems: "center" }]}> 
-          <TouchableOpacity
-            onPress={deleteRecording}
-            style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
-          >
-            <Trash2 size={20} color={colors.iconFg} />
-          </TouchableOpacity>
-          <VoiceNoteWaveform 
-            isRecording={true} 
-            color={colors.chatroom.primary} 
-            height={28} 
-            width={60} 
-          />
-          <Text style={{ color: colors.chatroom.text, fontWeight: "bold", fontSize: 18 }}>
-            {formatDuration(recordingDuration)}
-          </Text>
-          <TouchableOpacity
-            onPress={recordingPaused ? resumeRecording : pauseRecording}
-            style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
-          >
-            {recordingPaused ? (
-              <Play size={20} color={colors.iconFg} />
-            ) : (
-              <Pause size={20} color={colors.iconFg} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={stopRecording} style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}> 
-            <Send size={20} color={colors.iconFg} />
-          </TouchableOpacity>
-        </View>
-      );
-    }
     return (
-      <View style={[styles.inputRow, { minHeight: 52, maxHeight: 120, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 24, backgroundColor: colors.chatroom.inputBg, alignItems: 'center', margin: 0 }]}> {/* WhatsApp-like */}
-        <TouchableOpacity
-          onPress={() => setShowAttachmentModal(true)}
-          style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
-        >
-          <Paperclip size={20} color={colors.iconFg} />
-        </TouchableOpacity>
-        <TextInput
-          ref={inputRef}
-          style={[
-            styles.input,
-            {
-              backgroundColor: 'transparent',
-              color: colors.chatroom.inputText,
-              borderColor: 'transparent',
-              flex: 1,
-              minHeight: 40,
-              maxHeight: 100,
-              fontSize: 16,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-            },
-          ]}
-          placeholder="Type a message..."
-          placeholderTextColor={colors.placeholderDark}
-          value={messageText}
-          onChangeText={(t) => { setMessageText(t); handleTyping(!!t); }}
-          multiline
-          returnKeyType="send"
-          onSubmitEditing={handleSendMessage}
-        />
-        {messageText.trim().length > 0 ? (
-          <TouchableOpacity
-            style={[styles.mediaButton, { backgroundColor: colors.iconBg, opacity: sending ? 0.5 : 1 }]}
-            activeOpacity={0.7}
-            onPress={handleSendMessage}
-            disabled={sending}
-          >
-            <Send size={20} color={colors.iconFg} />
-          </TouchableOpacity>
+      <View style={[
+        styles.inputContainer, 
+        { 
+          backgroundColor: colors.chatroom.background, 
+          borderTopColor: colors.chatroom.border,
+          paddingBottom: Platform.OS === 'ios' ? (isKeyboardVisible ? 30 : 8) : (isKeyboardVisible ? 20 : 0),
+          paddingTop: isKeyboardVisible ? 12 : 8,
+          marginBottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 10 : 5) : 0,
+        }
+      ]}>
+        {replyingTo && (
+          <View style={[styles.replyPreview, { backgroundColor: colors.replyPreview, borderLeftWidth: 4, borderLeftColor: colors.iconFg, borderRadius: 8, padding: 6 }]}> 
+            <Text numberOfLines={1} style={{color: (replyingTo.sender && user && replyingTo.sender._id === user.id) ? colors.senderText : colors.receiverText, opacity: 0.6, fontStyle: 'italic'}}>{replyingTo.text || '📷 Image'}</Text>
+          </View>
+        )}
+        
+        {isRecording ? (
+          <View style={[styles.inputRow, { justifyContent: "space-between", alignItems: "center" }]}> 
+            <TouchableOpacity
+              onPress={deleteRecording}
+              style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
+              activeOpacity={0.7}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              <Trash2 size={20} color={colors.iconFg} />
+            </TouchableOpacity>
+            <VoiceNoteWaveform 
+              isRecording={true} 
+              color={colors.chatroom.primary} 
+              height={28} 
+              width={60} 
+            />
+            <Text style={{ color: colors.chatroom.text, fontWeight: "bold", fontSize: 18 }}>
+              {formatDuration(recordingDuration)}
+            </Text>
+            <TouchableOpacity
+              onPress={recordingPaused ? resumeRecording : pauseRecording}
+              style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
+              activeOpacity={0.7}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              {recordingPaused ? (
+                <Play size={20} color={colors.iconFg} />
+              ) : (
+                <Pause size={20} color={colors.iconFg} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={stopRecording} 
+              style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
+              activeOpacity={0.7}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            > 
+              <Send size={20} color={colors.iconFg} />
+            </TouchableOpacity>
+          </View>
         ) : (
-          <TouchableOpacity
-            style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
-            activeOpacity={0.7}
-            onPress={startRecording}
-          >
-            <Mic size={20} color={colors.iconFg} />
-          </TouchableOpacity>
+          <View style={[styles.inputRow, { minHeight: 52, maxHeight: 120, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 24, backgroundColor: colors.chatroom.inputBg, alignItems: 'center', margin: 0 }]}> {/* WhatsApp-like */}
+            <TouchableOpacity
+              onPress={() => setShowAttachmentModal(true)}
+              style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
+              activeOpacity={0.7}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            >
+              <Paperclip size={20} color={colors.iconFg} />
+            </TouchableOpacity>
+            <TextInput
+              ref={inputRef}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: 'transparent',
+                  color: colors.chatroom.inputText,
+                  borderColor: 'transparent',
+                  flex: 1,
+                  minHeight: 40,
+                  maxHeight: 100,
+                  fontSize: 16,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                },
+              ]}
+              placeholder="Type a message..."
+              placeholderTextColor={colors.placeholderDark}
+              value={messageText}
+              onChangeText={(t) => { setMessageText(t); handleTyping(!!t); }}
+              multiline
+              returnKeyType="send"
+              onSubmitEditing={handleSendMessage}
+            />
+            {messageText.trim().length > 0 ? (
+              <TouchableOpacity
+                style={[styles.mediaButton, { backgroundColor: colors.iconBg, opacity: sending ? 0.5 : 1 }]}
+                activeOpacity={0.7}
+                onPress={handleSendMessage}
+                disabled={sending}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                <Send size={20} color={colors.iconFg} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.mediaButton, { backgroundColor: colors.iconBg }]}
+                activeOpacity={0.7}
+                onPress={startRecording}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                <Mic size={20} color={colors.iconFg} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        
+        {isVoiceRecording && voiceRecordingUser && (
+          <View style={{ 
+            position: 'absolute', 
+            left: 0, 
+            right: 0, 
+            bottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 120 : 100) : 60, 
+            alignItems: 'center', 
+            zIndex: 100 
+          }}>
+            <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 15 }}>
+              🎤 {(voiceRecordingUser.fullName && voiceRecordingUser.fullName !== 'Unknown User') ? voiceRecordingUser.fullName : (voiceRecordingUser.username && voiceRecordingUser.username !== 'Unknown') ? voiceRecordingUser.username : 'User'} is recording a voice note...
+            </Text>
+          </View>
+        )}
+        
+        {typingUsers.length > 0 && (
+          <View style={{ 
+            paddingLeft: 16, 
+            paddingBottom: isKeyboardVisible ? 8 : 4,
+            position: 'absolute',
+            bottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 120 : 100) : 60,
+            left: 0,
+            right: 0,
+            zIndex: 5,
+          }}>
+            <Text style={{ color: colors.chatroom.secondary, fontStyle: 'italic' }}>
+              {typingUsers.length === 1
+                ? `${(typingUsers[0].fullName && typingUsers[0].fullName !== 'Unknown User') ? typingUsers[0].fullName : (typingUsers[0].username && typingUsers[0].username !== 'Unknown') ? typingUsers[0].username : 'User'} is typing...`
+                : `${typingUsers.map(u => (u.fullName && u.fullName !== 'Unknown User') ? u.fullName : (u.username && u.username !== 'Unknown') ? u.username : 'User').join(', ')} are typing...`}
+            </Text>
+          </View>
+        )}
+        
+        {/* COPIOT FIX: Final safety check - ensure typing indicator never shows current user */}
+        {__DEV__ && typingUsers.some(u => u.id === user?.id) && (
+          <View style={{ paddingLeft: 16, paddingBottom: 2 }}>
+            <Text style={{ color: 'red', fontSize: 10 }}>
+              ⚠️ BUG: Current user found in typing list! This should never happen.
+            </Text>
+          </View>
         )}
       </View>
     );
@@ -1814,8 +2047,12 @@ const handleEdit = async () => {
 
   // Render messages with date grouping
   const renderMessageWithDate = ({ item, index }: { item: any; index: number }) => {
+    // Defensive: If item is not an object or is a string/array, always return a <Text> error
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return <Text style={{ color: 'red' }}>Invalid message data: {String(item)}</Text>;
+    }
     if (item && 'type' in item && item.type === 'date') {
-      return <DateSeparator date={item.date} colors={colors} isUnread={item.date === 'Unread Messages'} />;
+      return <DateSeparator date={item.date ? String(item.date) : ''} colors={colors} isUnread={item.date === 'Unread Messages'} />;
     }
     if (item && !('type' in item)) {
       return (
@@ -1839,6 +2076,7 @@ const handleEdit = async () => {
         />
       );
     }
+    // Always return JSX, never a string
     return <Text style={{ color: colors.text }}>Unsupported message</Text>;
   };
 
@@ -1988,9 +2226,42 @@ const handleEdit = async () => {
     );
   };
 
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date()
+    const date = new Date(dateString)
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return "now"
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)}wk`
+    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}month`
+    return `${Math.floor(diffInSeconds / 31536000)}year`
+  }
+
+  // Defensive wrapper for FlatList renderItem
+  function safeRenderItem(renderFn: (props: any) => React.ReactNode): (props: any) => React.ReactElement | null {
+    return function(props: any): React.ReactElement | null {
+      const result = renderFn(props);
+      if (
+        typeof result === 'string' ||
+        Array.isArray(result) ||
+        result == null ||
+        (typeof result === 'object' && !React.isValidElement(result))
+      ) {
+        return <Text style={{ color: 'red' }}>Invalid render: {String(result)}</Text>;
+      }
+      if (React.isValidElement(result)) {
+        return result;
+      }
+      return <Text style={{ color: 'red' }}>Invalid item</Text>;
+    };
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.chatroom.background, paddingTop: Platform.OS === 'ios' ? 32 : 0 }]}>
+      <View style={[styles.container, { backgroundColor: colors.chatroom.background, paddingTop: Platform.OS === 'ios' ? 32 : 0 }]}>
         {loading && (
           <View style={[styles.loadingOverlay, { backgroundColor: "rgba(0,0,0,0.1)" }]}>
             <ActivityIndicator size="large" color={colors.chatroom.text} />
@@ -2012,31 +2283,56 @@ const handleEdit = async () => {
             <View style={[styles.attachmentModalContainer, { backgroundColor: colors.card }]}>
               <View style={styles.attachmentRow}>
                 <View style={styles.attachmentButtonContainer}>
-                  <TouchableOpacity style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} onPress={handleImagePicker}>
+                  <TouchableOpacity 
+                    style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} 
+                    onPress={handleImagePicker}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <Paperclip size={24} color={colors.iconFg} />
                   </TouchableOpacity>
                   <Text style={[styles.attachmentLabel, { color: colors.text }]}>Gallery</Text>
                 </View>
                 <View style={styles.attachmentButtonContainer}>
-                  <TouchableOpacity style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} onPress={handleCameraPicker}>
+                  <TouchableOpacity 
+                    style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} 
+                    onPress={handleCameraPicker}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <Camera size={24} color={colors.iconFg} />
                   </TouchableOpacity>
                   <Text style={[styles.attachmentLabel, { color: colors.text }]}>Camera</Text>
                 </View>
                 <View style={styles.attachmentButtonContainer}>
-                  <TouchableOpacity style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} onPress={handleVideoPicker}>
+                  <TouchableOpacity 
+                    style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} 
+                    onPress={handleVideoPicker}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <VideoIcon size={24} color={colors.iconFg} />
                   </TouchableOpacity>
                   <Text style={[styles.attachmentLabel, { color: colors.text }]}>Video</Text>
                 </View>
                 <View style={styles.attachmentButtonContainer}>
-                  <TouchableOpacity style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} onPress={handleVideoRecording}>
+                  <TouchableOpacity 
+                    style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} 
+                    onPress={handleVideoRecording}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <VideoIcon size={24} color={colors.iconFg} />
                   </TouchableOpacity>
                   <Text style={[styles.attachmentLabel, { color: colors.text }]}>Record</Text>
                 </View>
                 <View style={styles.attachmentButtonContainer}>
-                  <TouchableOpacity style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} onPress={handleAudioPicker}>
+                  <TouchableOpacity 
+                    style={[styles.attachmentButton, { backgroundColor: colors.iconBg }]} 
+                    onPress={handleAudioPicker}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <Music2 size={24} color={colors.iconFg} />
                   </TouchableOpacity>
                   <Text style={[styles.attachmentLabel, { color: colors.text }]}>Audio</Text>
@@ -2045,6 +2341,8 @@ const handleEdit = async () => {
               <TouchableOpacity
                 style={[styles.attachmentClose, { backgroundColor: colors.iconBg }]}
                 onPress={() => setShowAttachmentModal(false)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <X size={20} color={colors.iconFg} />
               </TouchableOpacity>
@@ -2064,63 +2362,115 @@ const handleEdit = async () => {
                 <TouchableWithoutFeedback>
                   <Animated.View style={[actionModalStyles.actionsModalContainer, { transform: [{ translateY: actionsAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }], opacity: actionsAnim }] }>
                     <View style={actionModalStyles.actionsRow}>
-                      <TouchableOpacity style={actionModalStyles.actionButton} onPress={() => handleAction('star')}>
+                      <TouchableOpacity 
+                        style={actionModalStyles.actionButton} 
+                        onPress={() => handleAction('star')}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
                         <View style={actionModalStyles.actionIconCircle}>
                           <Star size={24} color={colors.primary} />
                         </View>
                         <Text style={actionModalStyles.actionLabel}>Star</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={actionModalStyles.actionButton} onPress={() => handleAction('copy')}>
+                      <TouchableOpacity 
+                        style={actionModalStyles.actionButton} 
+                        onPress={() => handleAction('copy')}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
                         <View style={actionModalStyles.actionIconCircle}>
                           <Copy size={24} color={colors.primary} />
                         </View>
                         <Text style={actionModalStyles.actionLabel}>Copy</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={actionModalStyles.actionButton} onPress={() => handleAction('delete')}>
+                      <TouchableOpacity 
+                        style={actionModalStyles.actionButton} 
+                        onPress={() => handleAction('delete')}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
                         <View style={actionModalStyles.actionIconCircle}>
                           <Trash2 size={24} color={colors.primary} />
                         </View>
                         <Text style={actionModalStyles.actionLabel}>Delete</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={actionModalStyles.actionButton} onPress={() => handleAction('forward')}>
+                      <TouchableOpacity 
+                        style={actionModalStyles.actionButton} 
+                        onPress={() => handleAction('forward')}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
                         <View style={actionModalStyles.actionIconCircle}>
                           <Share2 size={24} color={colors.primary} />
                         </View>
                         <Text style={actionModalStyles.actionLabel}>Forward</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={actionModalStyles.actionButton} onPress={() => handleAction('reply')}>
+                      <TouchableOpacity 
+                        style={actionModalStyles.actionButton} 
+                        onPress={() => handleAction('reply')}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
                         <View style={actionModalStyles.actionIconCircle}>
                           <Reply size={24} color={colors.primary} />
                         </View>
                         <Text style={actionModalStyles.actionLabel}>Reply</Text>
                       </TouchableOpacity>
                       {actionsMessage?.sender._id === user?.id && (
-                        <TouchableOpacity style={actionModalStyles.actionButton} onPress={() => handleAction('info')}>
+                        <TouchableOpacity 
+                          style={actionModalStyles.actionButton} 
+                          onPress={() => handleAction('info')}
+                          activeOpacity={0.7}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
                           <View style={actionModalStyles.actionIconCircle}>
                             <Info size={24} color={colors.primary} />
                           </View>
                           <Text style={actionModalStyles.actionLabel}>Info</Text>
                         </TouchableOpacity>
                       )}
-                      <TouchableOpacity style={actionModalStyles.actionButton} onPress={() => setShowMenu(true)}>
+                      <TouchableOpacity 
+                        style={actionModalStyles.actionButton} 
+                        onPress={() => setShowMenu(true)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
                         <View style={actionModalStyles.actionIconCircle}>
                           <MoreVertical size={24} color={colors.primary} />
                         </View>
                         <Text style={actionModalStyles.actionLabel}>More</Text>
                       </TouchableOpacity>
                     </View>
-                    <TouchableOpacity style={actionModalStyles.cancelButton} onPress={closeActionsModal}>
+                    <TouchableOpacity 
+                      style={actionModalStyles.cancelButton} 
+                      onPress={closeActionsModal}
+                      activeOpacity={0.8}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
                       <Text style={actionModalStyles.cancelButtonText}>Cancel</Text>
                     </TouchableOpacity>
                     {showMenu && (
                       <View style={actionModalStyles.moreDropdown}>
-                        <TouchableOpacity style={actionModalStyles.moreDropdownItem} onPress={() => { setShowMenu(false); handleAction('pin'); }}>
+                        <TouchableOpacity 
+                          style={actionModalStyles.moreDropdownItem} 
+                          onPress={() => { setShowMenu(false); handleAction('pin'); }}
+                          activeOpacity={0.7}
+                        >
                           <Text style={actionModalStyles.moreDropdownText}>Pin</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={actionModalStyles.moreDropdownItem} onPress={() => { setShowMenu(false); handleAction('add_note'); }}>
+                        <TouchableOpacity 
+                          style={actionModalStyles.moreDropdownItem} 
+                          onPress={() => { setShowMenu(false); handleAction('add_note'); }}
+                          activeOpacity={0.7}
+                        >
                           <Text style={actionModalStyles.moreDropdownText}>Add text to note</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={actionModalStyles.moreDropdownItem} onPress={() => { setShowMenu(false); handleAction('quick_reply'); }}>
+                        <TouchableOpacity 
+                          style={actionModalStyles.moreDropdownItem} 
+                          onPress={() => { setShowMenu(false); handleAction('quick_reply'); }}
+                          activeOpacity={0.7}
+                        >
                           <Text style={actionModalStyles.moreDropdownText}>Add quick reply</Text>
                         </TouchableOpacity>
                       </View>
@@ -2138,6 +2488,8 @@ const handleEdit = async () => {
               <TouchableOpacity
                 onPress={() => navigation.goBack()}
                 style={[styles.backButton, { backgroundColor: colors.iconBackBg }]}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <ArrowLeft color={colors.iconBack} />
               </TouchableOpacity>
@@ -2146,10 +2498,11 @@ const handleEdit = async () => {
             </View>
             <FlatList
               data={chats}
-              renderItem={({ item }) => (
+              renderItem={safeRenderItem(({ item }: any) => (
                 <TouchableOpacity
                   style={[styles.chatItem, { backgroundColor: colors.background }]}
                   onPress={() => setActiveChat(item)}
+                  activeOpacity={0.8}
                 >
                   <View style={[styles.avatar, { backgroundColor: item.avatar.startsWith("http") ? "transparent" : colors.icon }]}>
                     {item.avatar.startsWith("http") ? (
@@ -2159,7 +2512,13 @@ const handleEdit = async () => {
                     )}
                   </View>
                   <View style={styles.chatInfo}>
-                    <Text style={[styles.chatName, { color: colors.text }]}>{item.fullName || item.name}</Text>
+                    <View style={styles.chatNameRow}>
+                      <Text style={[styles.chatName, { color: colors.text }]}>{item.fullName || item.name}</Text>
+                      {(() => {
+                        const { isVerified, isPremiumVerified } = getUserVerificationStatus(item.id)
+                        return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                      })()}
+                    </View>
                     <Text style={[styles.chatUsername, { color: colors.grey }]}>@{item.name}</Text>
                     <Text style={[styles.chatLastMessage, { color: colors.grey }]} numberOfLines={1}>
                       {item.lastMessage}
@@ -2176,9 +2535,11 @@ const handleEdit = async () => {
                     )}
                   </View>
                 </TouchableOpacity>
-              )}
+              ))}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.chatList}
+              refreshing={loading}
+              onRefresh={retryFetchChats}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Text style={[styles.emptyText, { color: colors.text }]}>
@@ -2186,11 +2547,17 @@ const handleEdit = async () => {
                   </Text>
                   {error && (
                     <TouchableOpacity
-                      onPress={() => fetchChats()}
+                      onPress={retryFetchChats}
                       style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                      activeOpacity={0.8}
                     >
-                      <Text style={styles.retryText}>Retry</Text>
+                      <Text style={styles.retryText}>Try Again</Text>
                     </TouchableOpacity>
+                  )}
+                  {!error && !loading && chats.length === 0 && (
+                    <Text style={[styles.emptyText, { color: colors.grey, fontSize: 14, marginTop: 10 }]}>
+                      Start a conversation by following someone or commenting on their posts!
+                    </Text>
                   )}
                 </View>
               }
@@ -2198,21 +2565,24 @@ const handleEdit = async () => {
             />
           </>
         ) : (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 120 : 20}
-          >
-            <SafeAreaView style={{ flex: 1, backgroundColor: colors.chatroom.background }}>
-              <ImageBackground
-                source={colors.chatroom.backgroundImage}
-                style={{ flex: 1 }}
-                resizeMode="cover"
-              >
+          <View style={{ flex: 1, backgroundColor: colors.chatroom.background }}>
+            <ImageBackground
+              source={colors.chatroom.backgroundImage}
+              style={{ flex: 1 }}
+              resizeMode="cover"
+            >
+              <View style={{ flex: 1 }}>
                 <View
                   style={[
                     styles.chatRoomHeader,
-                    { backgroundColor: colors.chatroom.background, borderBottomColor: colors.chatroom.border, paddingTop: Platform.OS === 'ios' ? 32 : 0, minHeight: 60, alignItems: 'center' },
+                    { 
+                      backgroundColor: colors.chatroom.background, 
+                      borderBottomColor: colors.chatroom.border, 
+                      paddingTop: Platform.OS === 'ios' ? 44 : 0, 
+                      minHeight: 60, 
+                      alignItems: 'center',
+                      flexShrink: 0, // Prevent header from shrinking
+                    },
                   ]}
                 >
                   <TouchableOpacity
@@ -2227,6 +2597,8 @@ const handleEdit = async () => {
                       isAtBottom.current = true;
                     }}
                     style={[styles.backButton, { backgroundColor: colors.iconBackBg }]}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <ArrowLeft color={colors.iconBack} />
                   </TouchableOpacity>
@@ -2239,12 +2611,17 @@ const handleEdit = async () => {
                     {activeChat.avatar.startsWith("http") ? (
                       <Image source={{ uri: activeChat.avatar }} style={styles.headerAvatar as any} />
                     ) : (
-                      <Text style={[styles.emojiText, { color: colors.chatroom.text }]}>{activeChat.avatar}</Text>
+                      <Text style={[styles.emojiText, { color: colors.chatroom.text }]}>{String(activeChat.avatar)}</Text>
                     )}
                   </View>
                   <View style={styles.headerChatInfo}>
-                    <Text style={[styles.headerChatName, { color: colors.text }]}>{activeChat.fullName || activeChat.name}</Text>
-                    <Text style={[styles.headerChatUsername, { color: colors.grey }]}>@{activeChat.name}</Text>
+                    <View style={styles.headerChatNameRow}>
+                      <Text style={[styles.headerChatName, { color: colors.text }]}>{(activeChat.fullName || activeChat.name).split(' ')[0]}</Text>
+                      {(() => {
+                        const { isVerified, isPremiumVerified } = getUserVerificationStatus(activeChat.id)
+                        return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                      })()}
+                    </View>
                   </View>
                   <TouchableOpacity
                     onPress={async () => {
@@ -2265,170 +2642,127 @@ const handleEdit = async () => {
                         borderColor: colors.primary,
                       },
                     ]}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                   >
                     {isFollowing ? <UserCheck size={16} color={colors.text} /> : <UserPlus size={16} color="white" />}
                   </TouchableOpacity>
                 </View>
 
-                <FlatList
-                  ref={flatListRef}
-                  data={(() => {
-                    const allMessages: Message[] = [...(messages || []), ...(drafts || [])];
-                    const groups: { [key: string]: Message[] } = groupMessagesByDate(allMessages, user?.id) || {};
-                    const flatData: (Message | { type: 'date'; date: string })[] = [];
-                    if (groups && typeof groups === 'object') {
-                      Object.entries(groups).forEach(([date, dateMessages]) => {
-                        flatData.push({ type: 'date', date });
-                        flatData.push(...(Array.isArray(dateMessages) ? dateMessages : []));
-                      });
-                    }
-                    return flatData;
-                  })()}
-                  renderItem={renderMessageWithDate}
-                  keyExtractor={(item: any, index: number) => {
-                    if ('type' in item && item.type === 'date') {
-                      return `date-${item.date}-${index}`;
-                    }
-                    return item.id ? `${item.id}-${index}` : `message-${Date.now()}-${index}`;
-                  }}
-                  contentContainerStyle={styles.messageList}
-                  showsVerticalScrollIndicator={true}
-                  onContentSizeChange={() => {
-                    if (isAtBottom.current) {
-                      flatListRef.current?.scrollToEnd({ animated: true });
-                      setUnreadCount(0);
-                    }
-                  }}
-                  onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-                    listener: (event: any) => {
-                      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-                      const offsetY = contentOffset.y;
-                      const contentHeight = contentSize.height;
-                      const visibleHeight = layoutMeasurement.height;
-                      const isBottom = offsetY >= contentHeight - visibleHeight - 10;
-                      isAtBottom.current = isBottom;
-                      setIsScrolledUp(!isBottom && offsetY > 50);
-                      if (isBottom) setUnreadCount(0);
-                    },
-                    useNativeDriver: false,
-                  })}
-                  scrollEventThrottle={16}
-                  keyboardShouldPersistTaps="handled"
-                  onScrollToIndexFailed={({ index, highestMeasuredFrameIndex }) => {
-                    // Scroll to the highest measured index, then try again after a short delay
-                    flatListRef.current?.scrollToIndex({
-                      index: highestMeasuredFrameIndex,
-                      animated: true,
-                    });
-                    setTimeout(() => {
-                      flatListRef.current?.scrollToIndex({ index, animated: true });
-                    }, 100);
-                  }}
-                />
-
-                {showScrollToBottom && (
-                  <Animated.View style={{
-                    position: 'absolute',
-                    bottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 140 : 120) : 80,
-                    right: 16,
-                    zIndex: 10,
-                    opacity: showScrollToBottom ? 1 : 0,
-                    transform: [{ translateY: scrollAnim }],
-                  }}>
-                    <TouchableOpacity 
-                      style={[styles.scrollToBottom, { 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 4,
-                        elevation: 5,
-                      }]} 
-                      onPress={() => {
-                        flatListRef.current?.scrollToEnd({ animated: true });
-                        setIsScrolledUp(false);
-                        setUnreadCount(0);
-                        isAtBottom.current = true;
-                      }}
-                    >
-                      <ThemeAwareScrollToBottom size={24} />
-                    </TouchableOpacity>
-                    {unreadCount > 0 && (
-                      <View style={[styles.unreadBadge, { 
-                        backgroundColor: colors.primary, 
-                        position: "absolute", 
-                        top: -8, 
-                        right: -8,
-                        minWidth: 20,
-                        height: 20,
-                        borderRadius: 10,
-                      }]}> 
-                        <Text style={[styles.unreadText, { fontSize: 12 }]}>{unreadCount}</Text> 
-                      </View>
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === "ios" ? "padding" : "height"}
+                  style={{ flex: 1 }}
+                  keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+                  enabled={true}
+                >
+                  <FlatList
+                    ref={flatListRef}
+                    data={(() => {
+                      const allMessages: Message[] = [...(messages || []), ...(drafts || [])];
+                      const groups: { [key: string]: Message[] } = groupMessagesByDate(allMessages, user?.id) || {};
+                      const flatData: (Message | { type: 'date'; date: string })[] = [];
+                      if (groups && typeof groups === 'object') {
+                        Object.entries(groups).forEach(([date, dateMessages]) => {
+                          flatData.push({ type: 'date', date });
+                          flatData.push(...(Array.isArray(dateMessages) ? dateMessages : []));
+                        });
+                      }
+                      return flatData;
+                    })()}
+                    renderItem={safeRenderItem(({ item }: any) => (
+                      renderMessageWithDate({ item, index: item.id }))
                     )}
-                  </Animated.View>
-                )}
+                    keyExtractor={(item: any, index: number) => {
+                      if ('type' in item && item.type === 'date') {
+                        return `date-${item.date}-${index}`;
+                      }
+                      return item.id ? `${item.id}-${index}` : `message-${Date.now()}-${index}`;
+                    }}
+                    contentContainerStyle={styles.messageList}
+                    showsVerticalScrollIndicator={true}
+                    onContentSizeChange={() => {
+                      if (isAtBottom.current) {
+                        flatListRef.current?.scrollToEnd({ animated: true });
+                        setUnreadCount(0);
+                      }
+                    }}
+                    onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+                      listener: (event: any) => {
+                        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                        const offsetY = contentOffset.y;
+                        const contentHeight = contentSize.height;
+                        const visibleHeight = layoutMeasurement.height;
+                        const isBottom = offsetY >= contentHeight - visibleHeight - 10;
+                        isAtBottom.current = isBottom;
+                        setIsScrolledUp(!isBottom && offsetY > 50);
+                        if (isBottom) setUnreadCount(0);
+                      },
+                      useNativeDriver: false,
+                    })}
+                    scrollEventThrottle={16}
+                    keyboardShouldPersistTaps="handled"
+                    onScrollToIndexFailed={({ index, highestMeasuredFrameIndex }) => {
+                      // Scroll to the highest measured index, then try again after a short delay
+                      flatListRef.current?.scrollToIndex({
+                        index: highestMeasuredFrameIndex,
+                        animated: true,
+                      });
+                      setTimeout(() => {
+                        flatListRef.current?.scrollToIndex({ index, animated: true });
+                      }, 100);
+                    }}
+                  />
 
-                <View style={[
-                  styles.inputContainer, 
-                  { 
-                    backgroundColor: colors.chatroom.background, 
-                    borderTopColor: colors.chatroom.border,
-                    paddingBottom: Platform.OS === 'ios' ? (isKeyboardVisible ? 30 : 8) : (isKeyboardVisible ? 20 : 0),
-                    paddingTop: isKeyboardVisible ? 12 : 8,
-                    marginBottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 10 : 5) : 0,
-                  }
-                ]}>
-                  {replyingTo && (
-                    <View style={[styles.replyPreview, { backgroundColor: colors.replyPreview, borderLeftWidth: 4, borderLeftColor: colors.iconFg, borderRadius: 8, padding: 6 }]}> 
-                      <Text numberOfLines={1} style={{color: (replyingTo.sender && user && replyingTo.sender._id === user.id) ? colors.senderText : colors.receiverText, opacity: 0.6, fontStyle: 'italic'}}>{replyingTo.text || '📷 Image'}</Text>
-                    </View>
+                  {showScrollToBottom && (
+                    <Animated.View style={{
+                      position: 'absolute',
+                      bottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 140 : 120) : 80,
+                      right: 16,
+                      zIndex: 10,
+                      opacity: showScrollToBottom ? 1 : 0,
+                      transform: [{ translateY: scrollAnim }],
+                    }}>
+                      <TouchableOpacity 
+                        style={[styles.scrollToBottom, { 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                          elevation: 5,
+                        }]} 
+                        onPress={() => {
+                          flatListRef.current?.scrollToEnd({ animated: true });
+                          setIsScrolledUp(false);
+                          setUnreadCount(0);
+                          isAtBottom.current = true;
+                        }}
+                        activeOpacity={0.8}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <ThemeAwareScrollToBottom size={24} />
+                      </TouchableOpacity>
+                      {unreadCount > 0 && (
+                        <View style={[styles.unreadBadge, { 
+                          backgroundColor: colors.primary, 
+                          position: "absolute", 
+                          top: -8, 
+                          right: -8,
+                          minWidth: 20,
+                          height: 20,
+                          borderRadius: 10,
+                        }]}> 
+                          <Text style={[styles.unreadText, { fontSize: 12 }]}>{unreadCount}</Text> 
+                        </View>
+                      )}
+                    </Animated.View>
                   )}
+
                   {renderInputRow()}
-                </View>
-                {isVoiceRecording && voiceRecordingUser && (
-                  <View style={{ 
-                    position: 'absolute', 
-                    left: 0, 
-                    right: 0, 
-                    bottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 120 : 100) : 60, 
-                    alignItems: 'center', 
-                    zIndex: 100 
-                  }}>
-                    <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 15 }}>
-                      🎤 {(voiceRecordingUser.fullName && voiceRecordingUser.fullName !== 'Unknown User') ? voiceRecordingUser.fullName : (voiceRecordingUser.username && voiceRecordingUser.username !== 'Unknown') ? voiceRecordingUser.username : 'User'} is recording a voice note...
-                    </Text>
-                  </View>
-                )}
-                {typingUsers.length > 0 && (
-                  <View style={{ 
-                    paddingLeft: 16, 
-                    paddingBottom: isKeyboardVisible ? 8 : 4,
-                    position: 'absolute',
-                    bottom: isKeyboardVisible ? (Platform.OS === 'ios' ? 120 : 100) : 60,
-                    left: 0,
-                    right: 0,
-                    zIndex: 5,
-                  }}>
-                    <Text style={{ color: colors.chatroom.secondary, fontStyle: 'italic' }}>
-                      {typingUsers.length === 1
-                        ? `${(typingUsers[0].fullName && typingUsers[0].fullName !== 'Unknown User') ? typingUsers[0].fullName : (typingUsers[0].username && typingUsers[0].username !== 'Unknown') ? typingUsers[0].username : 'User'} is typing...`
-                        : `${typingUsers.map(u => (u.fullName && u.fullName !== 'Unknown User') ? u.fullName : (u.username && u.username !== 'Unknown') ? u.username : 'User').join(', ')} are typing...`}
-                    </Text>
-                  </View>
-                )}
-                
-                {/* COPIOT FIX: Final safety check - ensure typing indicator never shows current user */}
-                {__DEV__ && typingUsers.some(u => u.id === user?.id) && (
-                  <View style={{ paddingLeft: 16, paddingBottom: 2 }}>
-                    <Text style={{ color: 'red', fontSize: 10 }}>
-                      ⚠️ BUG: Current user found in typing list! This should never happen.
-                    </Text>
-                  </View>
-                )}
-              </ImageBackground>
-            </SafeAreaView>
-          </KeyboardAvoidingView>
+                </KeyboardAvoidingView>
+              </View>
+            </ImageBackground>
+          </View>
         )}
 
         {error && (
@@ -2439,9 +2773,7 @@ const handleEdit = async () => {
             </TouchableOpacity>
           </View>
         )}
-      </SafeAreaView>
-
-
+      </View>
 
       {showForwardModal && (
   <Modal visible transparent animationType="slide" onRequestClose={() => setShowForwardModal(false)}>
@@ -2454,7 +2786,7 @@ const handleEdit = async () => {
           <FlatList
             data={followers}
             keyExtractor={item => item._id}
-            renderItem={({ item }) => (
+            renderItem={safeRenderItem(({ item }: any) => (
               <TouchableOpacity
                 onPress={() => {
                   if (forwardSelected.includes(item._id)) {
@@ -2476,7 +2808,7 @@ const handleEdit = async () => {
                 }} />
                 <Text style={{ color: colors.text }}>{item.fullName || item.username}</Text>
               </TouchableOpacity>
-            )}
+            ))}
             style={{ maxHeight: 200 }}
           />
           <TouchableOpacity
@@ -2630,6 +2962,11 @@ const styles: import("react-native").StyleSheet.NamedStyles<any> = StyleSheet.cr
     flex: 1,
     paddingRight: 10,
   },
+  chatNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
   chatName: {
     fontSize: 16,
     fontWeight: "bold",
@@ -2681,12 +3018,14 @@ const styles: import("react-native").StyleSheet.NamedStyles<any> = StyleSheet.cr
     flex: 1,
     marginLeft: 12,
   },
+  headerChatNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
   headerChatName: {
     fontSize: 16,
     fontWeight: "bold",
-  },
-  headerChatUsername: {
-    fontSize: 14,
   },
   followButton: {
     flexDirection: "row",
@@ -2776,7 +3115,7 @@ const styles: import("react-native").StyleSheet.NamedStyles<any> = StyleSheet.cr
     padding: 4,
     borderTopWidth: 0.3,
     width: "100%",
-    minHeight: 60,
+    flexShrink: 0, // Prevent shrinking
   },
   inputRow: {
     flexDirection: "row",

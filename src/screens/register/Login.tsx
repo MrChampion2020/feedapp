@@ -55,7 +55,6 @@ const Login: React.FC = () => {
       // Navigate to verification screen with the actual email
       navigation.navigate("Verify", { email: otpData.email || values.identifier })
     } catch (err: any) {
-      console.error("Login error:", err)
       setError(err.message || "Login failed")
     } finally {
       setIsLoading(false)

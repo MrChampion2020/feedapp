@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 5,
+    paddingBottom: 2,
     paddingTop: 0,
   },
   tabBar: {
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    marginBottom: 30
+    marginBottom: 20
   },
 })
 
