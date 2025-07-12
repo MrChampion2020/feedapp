@@ -419,7 +419,7 @@ const MessageItem = ({
                     fontStyle: 'italic'
                   }}
                 >
-                  {item.replyTo.text || '📷 Image'}
+                  {String(item.replyTo.text || '📷 Image')}
                 </Text>
               </View>
             )}
@@ -1651,40 +1651,86 @@ const ChatScreen = () => {
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  // --- UI Renderers ---
-  const renderTextWithLinks = (text: string, textColor?: string) => {
-    if (!text || typeof text !== 'string') {
-      return <Text key="empty" style={{ color: textColor }}> </Text>;
-    }
+  // // --- UI Renderers ---
+  // const renderTextWithLinks = (text: string, textColor?: string) => {
+  //   if (!text || typeof text !== 'string') {
+  //     return <Text key="empty" style={{ color: textColor }}> </Text>;
+  //   }
     
-    const parts = text.split(URL_REGEX);
-    const elements: React.ReactNode[] = [];
+  //   const parts = text.split(URL_REGEX);
+  //   const elements: React.ReactNode[] = [];
     
-    parts.forEach((part, index) => {
-      if (!part) {
-        elements.push(<Text key={index} style={{ color: textColor }}> </Text>);
-        return;
-      }
+  //   parts.forEach((part, index) => {
+  //     if (!part) {
+  //       elements.push(<Text key={index} style={{ color: textColor }}> </Text>);
+  //       return;
+  //     }
       
-      if (URL_REGEX.test(part)) {
-        elements.push(
-          <Text
-            key={index}
-            style={[styles.linkText, { color: colors.chatroom.link }]}
-            onPress={() => Linking.openURL(part.startsWith("http") ? part : `https://${part}`)}
-          >
-            {part}
-          </Text>
-        );
-      } else {
-        elements.push(<Text key={index} style={{ color: textColor }}>{part}</Text>);
-      }
-    });
+  //     if (URL_REGEX.test(part)) {
+  //       elements.push(
+  //         <Text
+  //           key={index}
+  //           style={[styles.linkText, { color: colors.chatroom.link }]}
+  //           onPress={() => Linking.openURL(part.startsWith("http") ? part : `https://${part}`)}
+  //         >
+  //           {part}
+  //         </Text>
+  //       );
+  //     } else {
+  //       elements.push(<Text key={index} style={{ color: textColor }}>{part}</Text>);
+  //     }
+  //   });
     
-    // Return the elements directly instead of wrapping them in another Text component
-    return <>{elements}</>;
-  };
+  //   // Use View to wrap multiple Text components instead of nesting Text inside Text
+  //   return (
+  //     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+  //       {elements}
+  //     </View>
+  //   );
+  // };
 
+
+  const renderTextWithLinks = (text: string, textColor?: string): React.ReactElement => {
+    try {
+      if (!text || typeof text !== 'string') {
+        return <Text style={{ color: textColor }}> </Text>; // ✅ fallback
+      }
+    
+      const parts = text.split(URL_REGEX);
+      const elements: React.ReactElement[] = [];
+    
+      parts.forEach((part, index) => {
+        if (!part) return;
+        if (URL_REGEX.test(part)) {
+          elements.push(
+            <Text
+              key={`link-${index}`}
+              style={[styles.linkText, { color: colors.chatroom.link }]}
+              onPress={() => Linking.openURL(part.startsWith("http") ? part : `https://${part}`)}
+            >
+              {part}
+            </Text>
+          );
+        } else {
+          elements.push(
+            <Text key={`text-${index}`} style={{ color: textColor }}>{part}</Text>
+          );
+        }
+      });
+    
+      return (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          {elements}
+        </View>
+      );
+    } catch (error) {
+      return <Text style={{ color: textColor || colors.text }}>Error rendering text</Text>;
+    }
+  };
+  
+
+
+  
   // --- Input Row Logic ---
   const renderInputRow = () => {
     return (
@@ -2046,38 +2092,47 @@ const handleEdit = async () => {
   }, [showScrollToBottom]);
 
   // Render messages with date grouping
-  const renderMessageWithDate = ({ item, index }: { item: any; index: number }) => {
-    // Defensive: If item is not an object or is a string/array, always return a <Text> error
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      return <Text style={{ color: 'red' }}>Invalid message data: {String(item)}</Text>;
+  const renderMessageWithDate = ({ item, index }: { item: any; index: number }): React.ReactElement => {
+    try {
+      // Defensive: If item is not an object or is a string/array, always return a <Text> error
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return <Text style={{ color: 'red' }}>Invalid message data: {String(item)}</Text>;
+      }
+      
+      // Handle date separator items
+      if (item && 'type' in item && item.type === 'date') {
+        return <DateSeparator date={item.date ? String(item.date) : ''} colors={colors} isUnread={item.date === 'Unread Messages'} />;
+      }
+      
+      // Handle regular message items
+      if (item && !('type' in item)) {
+        return (
+          <MessageItem
+            item={item}
+            user={user}
+            colors={colors}
+            handleSwipeGesture={(event, message) => {
+              const { translationX, state } = event.nativeEvent || {};
+              if (state === State.END && translationX > 50) {
+                setReplyingTo(message);
+              }
+            }}
+            renderTextWithLinks={renderTextWithLinks}
+            flatListRef={flatListRef as React.RefObject<FlatList<any>>}
+            onRemoveDraft={item.isDraft ? removeDraft : undefined}
+            onLongPress={handleLongPressMessage}
+            selectedMessage={selectedMessage}
+            getMessageTick={getMessageTick}
+            messageStatus={messageStatus}
+          />
+        );
+      }
+      
+      // Fallback for unsupported items
+      return <Text style={{ color: colors.text }}>Unsupported message type</Text>;
+    } catch (error) {
+      return <Text style={{ color: 'red' }}>Render error: {String(error)}</Text>;
     }
-    if (item && 'type' in item && item.type === 'date') {
-      return <DateSeparator date={item.date ? String(item.date) : ''} colors={colors} isUnread={item.date === 'Unread Messages'} />;
-    }
-    if (item && !('type' in item)) {
-      return (
-        <MessageItem
-          item={item}
-          user={user}
-          colors={colors}
-          handleSwipeGesture={(event, message) => {
-            const { translationX, state } = event.nativeEvent || {};
-            if (state === State.END && translationX > 50) {
-              setReplyingTo(message);
-            }
-          }}
-          renderTextWithLinks={renderTextWithLinks}
-          flatListRef={flatListRef as React.RefObject<FlatList<any>>}
-          onRemoveDraft={item.isDraft ? removeDraft : undefined}
-          onLongPress={handleLongPressMessage}
-          selectedMessage={selectedMessage}
-          getMessageTick={getMessageTick}
-          messageStatus={messageStatus} // pass messageStatus
-        />
-      );
-    }
-    // Always return JSX, never a string
-    return <Text style={{ color: colors.text }}>Unsupported message</Text>;
   };
 
   // 1. Add new styles for WhatsApp-style actions modal and dropdown
@@ -2241,21 +2296,36 @@ const handleEdit = async () => {
   }
 
   // Defensive wrapper for FlatList renderItem
-  function safeRenderItem(renderFn: (props: any) => React.ReactNode): (props: any) => React.ReactElement | null {
-    return function(props: any): React.ReactElement | null {
-      const result = renderFn(props);
-      if (
-        typeof result === 'string' ||
-        Array.isArray(result) ||
-        result == null ||
-        (typeof result === 'object' && !React.isValidElement(result))
-      ) {
+  function safeRenderItem(renderFn: (props: any) => React.ReactNode): (props: any) => React.ReactElement {
+    return function(props: any): React.ReactElement {
+      try {
+        const result = renderFn(props);
+        
+        // If result is already a valid React element, return it
+        if (React.isValidElement(result)) {
+          return result;
+        }
+        
+        // If result is a string, wrap it in Text
+        if (typeof result === 'string') {
+          return <Text style={{ color: colors.text }}>{result}</Text>;
+        }
+        
+        // If result is an array, wrap it in a View
+        if (Array.isArray(result)) {
+          return <View>{result}</View>;
+        }
+        
+        // If result is null/undefined, return empty Text
+        if (result == null) {
+          return <Text style={{ color: colors.text }}> </Text>;
+        }
+        
+        // For any other case, return error Text
         return <Text style={{ color: 'red' }}>Invalid render: {String(result)}</Text>;
+      } catch (error) {
+        return <Text style={{ color: 'red' }}>Render error: {String(error)}</Text>;
       }
-      if (React.isValidElement(result)) {
-        return result;
-      }
-      return <Text style={{ color: 'red' }}>Invalid item</Text>;
     };
   }
 
@@ -2498,7 +2568,7 @@ const handleEdit = async () => {
             </View>
             <FlatList
               data={chats}
-              renderItem={safeRenderItem(({ item }: any) => (
+              renderItem={safeRenderItem(({ item }: any) => 
                 <TouchableOpacity
                   style={[styles.chatItem, { backgroundColor: colors.background }]}
                   onPress={() => setActiveChat(item)}
@@ -2535,7 +2605,7 @@ const handleEdit = async () => {
                     )}
                   </View>
                 </TouchableOpacity>
-              ))}
+              )}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.chatList}
               refreshing={loading}
@@ -2669,8 +2739,8 @@ const handleEdit = async () => {
                       }
                       return flatData;
                     })()}
-                    renderItem={safeRenderItem(({ item }: any) => (
-                      renderMessageWithDate({ item, index: item.id }))
+                    renderItem={safeRenderItem(({ item }: any) => 
+                      renderMessageWithDate({ item, index: item.id })
                     )}
                     keyExtractor={(item: any, index: number) => {
                       if ('type' in item && item.type === 'date') {
@@ -2786,7 +2856,7 @@ const handleEdit = async () => {
           <FlatList
             data={followers}
             keyExtractor={item => item._id}
-            renderItem={safeRenderItem(({ item }: any) => (
+            renderItem={safeRenderItem(({ item }: any) => 
               <TouchableOpacity
                 onPress={() => {
                   if (forwardSelected.includes(item._id)) {
@@ -2808,7 +2878,7 @@ const handleEdit = async () => {
                 }} />
                 <Text style={{ color: colors.text }}>{item.fullName || item.username}</Text>
               </TouchableOpacity>
-            ))}
+            )}
             style={{ maxHeight: 200 }}
           />
           <TouchableOpacity

@@ -161,7 +161,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <View style={[styles.replyContainer, { borderLeftColor: colors.border }]}>
               <Reply size={16} color={colors.placeholder} style={{ marginRight: 6 }} />
               <Text style={[styles.replyText, { color: colors.placeholder }]} numberOfLines={1}>
-                {item.replyTo.text || "📷 Image"}
+                {String(item.replyTo.text || "📷 Image")}
               </Text>
             </View>
           )}
@@ -172,17 +172,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <TouchableOpacity onPress={() => console.log("Image pressed - could open full screen view")}>
               <Image source={{ uri: item.image }} style={styles.messageImage} />
             </TouchableOpacity>
-          ) : item.messageType === "text-image" && item.image && item.text ? (
+                    ) : item.messageType === "text-image" && item.image && item.text ? (
             <>
-              <TouchableOpacity onPress={() => console.log("Image pressed - could open full screen view")}>
+              <TouchableOpacity onPress={() => console.log("Image pressed - could open full screen view")}> 
                 <Image source={{ uri: item.image }} style={styles.messageImage} />
               </TouchableOpacity>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              <View style={styles.messageContainer}>
                 {renderTextWithLinks(item.text || "")}
               </View>
             </>
           ) : (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            <View style={styles.messageContainer}>
               {renderTextWithLinks(item.text || "")}
             </View>
           )}
@@ -218,6 +218,9 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 14,
+    marginBottom: 4,
+  },
+  messageContainer: {
     marginBottom: 4,
   },
   messageImage: {
