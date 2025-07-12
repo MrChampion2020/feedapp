@@ -25,6 +25,7 @@ import { AVPlaybackStatus, Video } from "expo-av";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../types/navigation";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import SuccessNotification from "../../components/SuccessNotification";
 
 type UploadFeedNavigationProp = NativeStackNavigationProp<RootStackParamList, "UploadFeed">;
 
@@ -42,6 +43,8 @@ const UploadFeed = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const navigation = useNavigation<UploadFeedNavigationProp>();
   const { user, token, api } = useAuth();
   const videoRef = useRef<Video>(null);
@@ -181,7 +184,7 @@ const UploadFeed = () => {
       newMedia.push({ ...item, progress: 0 });
     }
     setMedia(newMedia);
-    setSelectedGalleryIndices(newMedia.map((m) => galleryMedia.findIndex((gm) => gm.uri === m.uri)).filter((i) => i !== -1));
+    // Automatically add selected media to post content - no need for draft area
     setError("");
   };
 
@@ -332,21 +335,21 @@ const UploadFeed = () => {
         setMedia((prev) => prev.map((m, i) => i === index ? { ...m, progress: 0 } : m));
       });
 
-      const response = await retryUpload(formData);
-
-      setUploadProgress(100);
-      Alert.alert("Success", "Post uploaded successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            setCaption("");
-            setMedia([]);
-            setSelectedGalleryIndices([]);
-            setUploadProgress(0);
-            navigation.navigate("HomeTab" as never);
-          },
-        },
-      ]);
+      // Navigate to home immediately while upload happens in background
+      setCaption("");
+      setMedia([]);
+      setSelectedGalleryIndices([]);
+      setUploadProgress(0);
+      navigation.navigate("HomeTab" as never);
+      
+      // Background upload - don't await, let it happen in background
+      retryUpload(formData).then(() => {
+        setSuccessMessage("Post uploaded");
+        setShowSuccessNotification(true);
+      }).catch((err: any) => {
+        console.error("Background upload failed:", err);
+        // Don't show error to user since they've already navigated away
+      });
     } catch (err: any) {
       let errorMessage = "Upload failed.";
       if (err.response) {
@@ -387,17 +390,8 @@ const UploadFeed = () => {
     }
     return (
       <TouchableOpacity
-        style={[
-          styles.galleryItem,
-          selectedGalleryIndices.includes(index) && styles.selectedGalleryItem,
-        ]}
-        onPress={() => {
-          if (selectedGalleryIndices.includes(index)) {
-            removeMedia(media.findIndex((m) => m.uri === item.uri));
-          } else {
-            handleMediaSelected([item]);
-          }
-        }}
+        style={styles.galleryItem}
+        onPress={() => handleMediaSelected([item])}
         disabled={isUploading}
         activeOpacity={0.8}
       >
@@ -407,13 +401,6 @@ const UploadFeed = () => {
             <Icon name="play-circle-outline" size={24} color="white" />
           </View>
         )}
-        {selectedGalleryIndices.includes(index) && (
-          <View style={styles.progressOverlay}>
-            <Text style={styles.progressText}>
-              {media.find((m) => m.uri === item.uri)?.progress || 0}%
-            </Text>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
@@ -421,6 +408,13 @@ const UploadFeed = () => {
   return (
     <Animated.View style={[styles.container, { opacity: containerOpacity, backgroundColor: colors.background }]}>
       <Video ref={videoRef} style={{ display: "none" }} />
+      <SuccessNotification
+        visible={showSuccessNotification}
+        message={successMessage}
+        onHide={() => setShowSuccessNotification(false)}
+        duration={2000}
+        colors={colors}
+      />
       <View style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Header */}

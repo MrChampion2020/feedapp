@@ -67,6 +67,7 @@ import io, { Socket } from "socket.io-client";
 import { api, API_URL } from '../../contexts/AuthContext';
 import VerifiedBadge from "../../components/VerifiedBadge";
 import { getUserVerificationStatus } from "../../utils/userUtils";
+import SuccessNotification from "../../components/SuccessNotification";
 
 type ChatScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Chat">;
 
@@ -86,6 +87,9 @@ interface Message {
   image?: string;
   audio?: string;
   video?: string;
+  images?: string[]; // Multiple images
+  videos?: string[]; // Multiple videos
+  audios?: string[]; // Multiple audios
   messageType:
     | "text"
     | "image"
@@ -94,7 +98,8 @@ interface Message {
     | "audio"
     | "video"
     | "text-audio"
-    | "text-video";
+    | "text-video"
+    | "multiple-media";
   sender: { _id: string; username: string; fullName: string; profilePicture?: string };
   timestamp: string;
   replyTo?: Message;
@@ -126,27 +131,54 @@ const getEmojiFromName = (name: string) => {
 const parsePostCommentMessage = (text: string) => {
   if (!text) return { isPostComment: false, text };
 
-  const imgMatch = text.match(/\[img\](.*?)\[\/img\]/);
-  const faintMatch = text.match(/\[faint\](.*?)\[\/faint\]/);
-  const commentMatch = text.match(/Comment: (.*)/);
+  // Try multiple patterns for comment messages
+  const patterns = [
+    // Pattern 1: [img]URL[/img][faint]details[/faint]Comment: text
+    {
+      imgMatch: text.match(/\[img\](.*?)\[\/img\]/),
+      faintMatch: text.match(/\[faint\](.*?)\[\/faint\]/),
+      commentMatch: text.match(/Comment: (.*)/)
+    },
+    // Pattern 2: Comment on post with image URL directly
+    {
+      imgMatch: text.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i),
+      faintMatch: text.match(/Post: (.*?)(?=Comment:|$)/),
+      commentMatch: text.match(/Comment: (.*)/)
+    },
+    // Pattern 3: Just look for image URLs in comment messages
+    {
+      imgMatch: text.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i),
+      faintMatch: text.match(/\[faint\](.*?)\[\/faint\]/),
+      commentMatch: text.match(/Comment: (.*)/)
+    }
+  ];
 
-  if (imgMatch && faintMatch && commentMatch) {
-    const imageUrl = imgMatch[1];
-    const postDetails = faintMatch[1];
-    const comment = commentMatch[1];
-    const parts = postDetails.split(" (");
-    const caption = parts[0];
-    const originalCaption = parts[1] ? parts[1].replace(")", "") : caption;
+  for (const pattern of patterns) {
+    if (pattern.imgMatch && pattern.commentMatch) {
+      const imageUrl = pattern.imgMatch[1];
+      const comment = pattern.commentMatch[1];
+      let caption = "Post";
+      let timestamp = "2 days ago";
 
-    return {
-      isPostComment: true,
-      postData: {
-        image: imageUrl,
-        caption: caption,
-        timestamp: "2 days ago", // Use 'timestamp' instead of 'createdAt'
-      },
-      comment: comment,
-    };
+      if (pattern.faintMatch) {
+        const postDetails = pattern.faintMatch[1];
+        const parts = postDetails.split(" (");
+        caption = parts[0];
+        timestamp = parts[1] ? parts[1].replace(")", "") : "2 days ago";
+      }
+
+      console.log("🔍 Parsed comment message:", { imageUrl, caption, comment, timestamp });
+
+      return {
+        isPostComment: true,
+        postData: {
+          image: imageUrl,
+          caption: caption,
+          timestamp: timestamp,
+        },
+        comment: comment,
+      };
+    }
   }
 
   return { isPostComment: false, text };
@@ -160,24 +192,39 @@ const PostCommentPreview = ({
   postData: any;
   comment: string;
   colors: any;
-}) => (
-  <View style={{backgroundColor: colors.commentCard, borderRadius: 12, padding: 10, marginVertical: 4}}>
-    <View style={styles.postPreviewContainer}>
-      <Image source={{ uri: postData.image }} style={styles.postPreviewImage as any} />
-      <View style={[styles.postDetailsContainer, { backgroundColor: colors.chatroom.com }]}>
-        <Text style={[styles.postLabel, { color: colors.chatroom.headerText }]}>Post:</Text>
-        <Text style={[styles.postCaption, { color: colors.chatroom.headerText }]} numberOfLines={1}>
-          {postData.caption}
-        </Text>
-        <Text style={[styles.postTimestamp, { color: colors.chatroom.secondary }]}>{postData.timestamp}</Text>
+}) => {
+  console.log("🖼️ Rendering PostCommentPreview:", { postData, comment });
+  
+  return (
+    <View style={{backgroundColor: colors.commentCard, borderRadius: 12, padding: 10, marginVertical: 4}}>
+      <View style={styles.postPreviewContainer}>
+        {postData.image ? (
+          <Image 
+            source={{ uri: postData.image }} 
+            style={styles.postPreviewImage as any}
+            onError={(error) => console.log("❌ Image load error:", error)}
+            onLoad={() => console.log("✅ Image loaded successfully:", postData.image)}
+          />
+        ) : (
+          <View style={[styles.postPreviewImage, { backgroundColor: colors.chatroom.border, justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ color: colors.chatroom.secondary, fontSize: 12 }}>No Image</Text>
+          </View>
+        )}
+        <View style={[styles.postDetailsContainer, { backgroundColor: colors.chatroom.com }]}>
+          <Text style={[styles.postLabel, { color: colors.chatroom.headerText }]}>Post:</Text>
+          <Text style={[styles.postCaption, { color: colors.chatroom.headerText }]} numberOfLines={1}>
+            {postData.caption}
+          </Text>
+          <Text style={[styles.postTimestamp, { color: colors.chatroom.secondary }]}>{postData.timestamp}</Text>
+        </View>
+      </View>
+      <View style={[styles.commentContainer, { backgroundColor: colors.chatroom.rec }]}>
+        <Text style={[styles.commentLabel, { color: colors.chatroom.text }]}>Comment: </Text>
+        <Text style={[styles.commentText, { color: colors.chatroom.text }]}>{comment}</Text>
       </View>
     </View>
-    <View style={[styles.commentContainer, { backgroundColor: colors.chatroom.rec }]}>
-      <Text style={[styles.commentLabel, { color: colors.chatroom.text }]}>Comment: </Text>
-      <Text style={[styles.commentText, { color: colors.chatroom.text }]}>{comment}</Text>
-    </View>
-  </View>
-);
+  );
+};
 
 // Voice note waveform component
 const VoiceNoteWaveform = ({ 
@@ -254,6 +301,26 @@ const MessageItem = ({
   getMessageTick: (msg: Message) => string;
   messageStatus: { [key: string]: string };
 }) => {
+  // Download media functionality
+  const handleDownloadMedia = async (uri: string, type: 'image' | 'video' | 'audio') => {
+    try {
+      // For now, we'll use the Share API to allow users to save media
+      // In a real app, you'd implement proper file download to device storage
+      const fileName = `feeda_${type}_${Date.now()}.${type === 'image' ? 'jpg' : type === 'video' ? 'mp4' : 'm4a'}`;
+      
+      await Share.share({
+        url: uri,
+        title: `Feeda ${type}`,
+        message: `Sharing ${type} from Feeda chat`,
+      });
+      
+      // Show success notification (you might want to pass this as a prop)
+      console.log(`${type} shared successfully`);
+    } catch (error) {
+      console.error('Failed to share media:', error);
+      Alert.alert('Error', 'Failed to share media');
+    }
+  };
   if (!user) return null;
   const translateX = useRef(new Animated.Value(0)).current;
   const panRef = useRef(null);
@@ -262,13 +329,10 @@ const MessageItem = ({
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [modalVideoIndex, setModalVideoIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
 
-  // Support for multiple images (extend Message type if needed)
-  const images = Array.isArray(item.image) ? item.image.filter(Boolean) : item.image ? [item.image] : [];
-
-  // For video/audio URIs
-  const videoUri = item.video || "";
+  // For audio URIs and existing media
   const audioUri = item.audio || "";
 
   const onGestureEvent = (event: any) => {
@@ -424,50 +488,18 @@ const MessageItem = ({
               </View>
             )}
 
-            {/* Images Grid */}
-            {images.length > 1 ? (
-              <FlatList
-                data={images}
-                numColumns={2}
-                keyExtractor={(uri, idx) => uri + idx}
-                renderItem={({ item: img, index }) => (
-                  img ? (
-                    <TouchableOpacity
-                      onPress={() => { setModalImageIndex(index); setShowImageModal(true); }}
-                      style={{ flex: 1, margin: 2 }}
-                      activeOpacity={0.8}
-                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                    >
-                      <Image source={{ uri: img }} style={[styles.messageImage as any, { aspectRatio: 1, width: 120 }]} />
-                    </TouchableOpacity>
-                  ) : null
-                )}
-                style={{ marginVertical: 4 }}
-                scrollEnabled={false}
-              />
-            ) : images.length === 1 && images[0] ? (
+            {/* Display existing media in chat history */}
+            {item.image && (
               <TouchableOpacity 
                 onPress={() => { setModalImageIndex(0); setShowImageModal(true); }}
                 activeOpacity={0.8}
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
               >
-                <Image source={{ uri: images[0] }} style={styles.messageImage as any} />
+                <Image source={{ uri: item.image }} style={styles.messageImage as any} />
               </TouchableOpacity>
-            ) : null}
-
-            {/* Image Modal */}
-            <Modal visible={showImageModal} transparent animationType="fade" onRequestClose={() => setShowImageModal(false)}>
-              <TouchableWithoutFeedback onPress={() => setShowImageModal(false)}>
-                <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" }}>
-                  {images[modalImageIndex] ? (
-                    <Image source={{ uri: images[modalImageIndex] }} style={{ width: "90%", height: "70%", borderRadius: 12 }} resizeMode="contain" />
-                  ) : null}
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
-
-            {/* Video Display */}
-            {item.messageType === "video" && videoUri ? (
+            )}
+            
+            {item.video && (
               <TouchableOpacity 
                 onPress={() => setShowVideoModal(true)}
                 activeOpacity={0.8}
@@ -475,7 +507,7 @@ const MessageItem = ({
               >
                 <View style={{ position: "relative" }}>
                   <Video
-                    source={{ uri: videoUri }}
+                    source={{ uri: item.video }}
                     style={[styles.messageVideo, { borderRadius: 8 }]}
                     resizeMode={ResizeMode.COVER}
                     shouldPlay={false}
@@ -487,29 +519,145 @@ const MessageItem = ({
                   </View>
                 </View>
               </TouchableOpacity>
-            ) : null}
-            {/* Video Modal */}
-            <Modal visible={showVideoModal} transparent animationType="fade" onRequestClose={() => setShowVideoModal(false)}>
-              <TouchableWithoutFeedback onPress={() => setShowVideoModal(false)}>
-                <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" }}>
-                  {videoUri ? (
-                    <Video
-                      source={{ uri: videoUri }}
-                      style={{ width: "90%", height: 300, borderRadius: 12 }}
-                      resizeMode={ResizeMode.CONTAIN}
-                      shouldPlay
-                      useNativeControls
-                    />
-                  ) : null}
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
+            )}
+            
+            {/* Display multiple media files in grid */}
+            {item.images && item.images.length > 0 && (
+              <View style={styles.multipleMediaGrid}>
+                {item.images.map((imageUri, index) => (
+                  <View key={index} style={styles.mediaGridItem}>
+                    <TouchableOpacity 
+                      onPress={() => { setModalImageIndex(index); setShowImageModal(true); }}
+                      activeOpacity={0.8}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                    >
+                      <Image source={{ uri: imageUri }} style={styles.multipleMediaImage as any} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.downloadButton}
+                      onPress={() => handleDownloadMedia(imageUri, 'image')}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                    >
+                      <Download size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {item.videos && item.videos.length > 0 && (
+              <View style={styles.multipleMediaGrid}>
+                {item.videos.map((videoUri, index) => (
+                  <View key={index} style={styles.mediaGridItem}>
+                    <TouchableOpacity 
+                      onPress={() => { setModalVideoIndex(index); setShowVideoModal(true); }}
+                      activeOpacity={0.8}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                    >
+                      <View style={{ position: "relative" }}>
+                        <Video
+                          source={{ uri: videoUri }}
+                          style={styles.multipleMediaVideo as any}
+                          resizeMode={ResizeMode.COVER}
+                          shouldPlay={false}
+                          useNativeControls={false}
+                          isLooping={false}
+                        />
+                        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" }}>
+                          <Play size={16} color="#fff" style={{ opacity: 0.8 }} />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.downloadButton}
+                      onPress={() => handleDownloadMedia(videoUri, 'video')}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                    >
+                      <Download size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {item.audios && item.audios.length > 0 && (
+              <View style={styles.multipleMediaGrid}>
+                {item.audios.map((audioUri, index) => (
+                  <View key={index} style={styles.mediaGridItem}>
+                    <TouchableOpacity 
+                      onPress={() => playAudio(audioUri)} 
+                      style={styles.audioGridItem}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                    >
+                      <View style={[styles.audioPreview, { backgroundColor: colors.primary }]}>
+                        <Music2 size={20} color="white" />
+                      </View>
+                      <View style={styles.audioInfo}>
+                        <VoiceNoteWaveform 
+                          isPlaying={isPlaying} 
+                          color={colors.chatroom.primary} 
+                          height={16} 
+                          width={32} 
+                        />
+                        <Text style={[styles.audioText, { color: isSender ? colors.senderText : colors.receiverText }]}> 
+                          Audio {index + 1}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.downloadButton}
+                      onPress={() => handleDownloadMedia(audioUri, 'audio')}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                    >
+                      <Download size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* Media indicators for new messages without media URIs */}
+            {!item.image && !item.video && item.messageType === "image" && (
+              <Text style={[styles.messageText, { color: isSender ? colors.senderText : colors.receiverText, fontStyle: 'italic' }]}>
+                📷 Image
+              </Text>
+            )}
+            {!item.image && !item.video && item.messageType === "video" && (
+              <Text style={[styles.messageText, { color: isSender ? colors.senderText : colors.receiverText, fontStyle: 'italic' }]}>
+                🎥 Video
+              </Text>
+            )}
+            {!item.audio && item.messageType === "audio" && (
+              <Text style={[styles.messageText, { color: isSender ? colors.senderText : colors.receiverText, fontStyle: 'italic' }]}>
+                🎵 Audio
+              </Text>
+            )}
 
-            {/* Audio, text, and other message types remain unchanged below */}
+            {/* Post Comment Messages */}
+            {item.messageType === "post-comment" && item.postData ? (
+              <PostCommentPreview
+                postData={item.postData}
+                comment={item.text || ""}
+                colors={colors}
+              />
+            ) : null}
+            
+            {/* Text messages */}
+            {item.text && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {renderTextWithLinks(item.text || "", isSender ? colors.senderText : colors.receiverText)}
+              </View>
+            )}
+            
+            {/* Audio playback for voice notes */}
             {item.messageType === "audio" && audioUri ? (
               <TouchableOpacity 
                 onPress={() => playAudio(audioUri)} 
-                style={{ flexDirection: "row", alignItems: "center" }}
+                style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}
                 activeOpacity={0.7}
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
               >
@@ -524,60 +672,114 @@ const MessageItem = ({
                 </Text>
               </TouchableOpacity>
             ) : null}
-            {item.messageType === "text-audio" && item.audio && item.text ? (
-              <>
-                <TouchableOpacity 
-                  onPress={() => item.audio && playAudio(item.audio)} 
-                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                >
-                  <VoiceNoteWaveform 
-                    isPlaying={isPlaying} 
-                    color={isSender ? colors.senderText : colors.receiverText} 
-                    height={24} 
-                    width={60} 
-                  />
-                  <Text style={[styles.messageText, { color: isSender ? colors.senderText : colors.receiverText }]}> 
-                    {isPlaying ? "⏹ Stop" : "▶️ Play"} 
-                  </Text>
-                </TouchableOpacity>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  {renderTextWithLinks(item.text || "", isSender ? colors.senderText : colors.receiverText)}
+
+            {/* Image Modal for existing images */}
+            <Modal visible={showImageModal} transparent animationType="fade" onRequestClose={() => setShowImageModal(false)}>
+              <TouchableWithoutFeedback onPress={() => setShowImageModal(false)}>
+                <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" }}>
+                  {(() => {
+                    const images = item.images || (item.image ? [item.image] : []);
+                    const currentImage = images[modalImageIndex];
+                    
+                    if (!currentImage) return null;
+                    
+                    return (
+                      <View style={{ width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }}>
+                        <Image 
+                          source={{ uri: currentImage }} 
+                          style={{ width: "90%", height: "70%", borderRadius: 12 }} 
+                          resizeMode="contain" 
+                        />
+                        {images.length > 1 && (
+                          <View style={{ 
+                            position: 'absolute', 
+                            bottom: 50, 
+                            flexDirection: 'row', 
+                            gap: 10,
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                            padding: 10,
+                            borderRadius: 20
+                          }}>
+                            <TouchableOpacity 
+                              onPress={() => setModalImageIndex(Math.max(0, modalImageIndex - 1))}
+                              disabled={modalImageIndex === 0}
+                              style={{ opacity: modalImageIndex === 0 ? 0.5 : 1 }}
+                            >
+                              <Text style={{ color: 'white', fontSize: 18 }}>‹</Text>
+                            </TouchableOpacity>
+                            <Text style={{ color: 'white', fontSize: 14 }}>
+                              {modalImageIndex + 1} / {images.length}
+                            </Text>
+                            <TouchableOpacity 
+                              onPress={() => setModalImageIndex(Math.min(images.length - 1, modalImageIndex + 1))}
+                              disabled={modalImageIndex === images.length - 1}
+                              style={{ opacity: modalImageIndex === images.length - 1 ? 0.5 : 1 }}
+                            >
+                              <Text style={{ color: 'white', fontSize: 18 }}>›</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
                 </View>
-              </>
-            ) : null}
-            {item.messageType === "text-image" && item.image && item.text ? (
-              <>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                >
-                  <Image source={{ uri: item.image }} style={styles.messageImage as any} />
-                </TouchableOpacity>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  {renderTextWithLinks(item.text || "", isSender ? colors.senderText : colors.receiverText)}
+              </TouchableWithoutFeedback>
+            </Modal>
+
+            {/* Video Modal for existing videos */}
+            <Modal visible={showVideoModal} transparent animationType="fade" onRequestClose={() => setShowVideoModal(false)}>
+              <TouchableWithoutFeedback onPress={() => setShowVideoModal(false)}>
+                <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" }}>
+                  {(() => {
+                    const videos = item.videos || (item.video ? [item.video] : []);
+                    const currentVideo = videos[modalVideoIndex];
+                    
+                    if (!currentVideo) return null;
+                    
+                    return (
+                      <View style={{ width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }}>
+                        <Video
+                          source={{ uri: currentVideo }}
+                          style={{ width: "90%", height: 300, borderRadius: 12 }}
+                          resizeMode={ResizeMode.CONTAIN}
+                          shouldPlay
+                          useNativeControls
+                        />
+                        {videos.length > 1 && (
+                          <View style={{ 
+                            position: 'absolute', 
+                            bottom: 50, 
+                            flexDirection: 'row', 
+                            gap: 10,
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                            padding: 10,
+                            borderRadius: 20
+                          }}>
+                            <TouchableOpacity 
+                              onPress={() => setModalVideoIndex(Math.max(0, modalVideoIndex - 1))}
+                              disabled={modalVideoIndex === 0}
+                              style={{ opacity: modalVideoIndex === 0 ? 0.5 : 1 }}
+                            >
+                              <Text style={{ color: 'white', fontSize: 18 }}>‹</Text>
+                            </TouchableOpacity>
+                            <Text style={{ color: 'white', fontSize: 14 }}>
+                              {modalVideoIndex + 1} / {videos.length}
+                            </Text>
+                            <TouchableOpacity 
+                              onPress={() => setModalVideoIndex(Math.min(videos.length - 1, modalVideoIndex + 1))}
+                              disabled={modalVideoIndex === videos.length - 1}
+                              style={{ opacity: modalVideoIndex === videos.length - 1 ? 0.5 : 1 }}
+                            >
+                              <Text style={{ color: 'white', fontSize: 18 }}>›</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
                 </View>
-              </>
-            ) : item.messageType === "text-video" && item.video && item.text ? (
-              <>
-                <Video
-                  source={{ uri: item.video }}
-                  style={styles.messageVideo}
-                  useNativeControls
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay={false}
-                />
-                <Text style={[styles.messageText, { color: colors.receiverText }]}>🎥 Video</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  {renderTextWithLinks(item.text || "", isSender ? colors.senderText : colors.receiverText)}
-                </View>
-              </>
-            ) : item.messageType === "text" && item.text ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                {renderTextWithLinks(item.text || "", isSender ? colors.senderText : colors.receiverText)}
-              </View>
-            ) : null}
+              </TouchableWithoutFeedback>
+            </Modal>
 
             <View style={{ 
               flexDirection: 'row', 
@@ -688,7 +890,6 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [drafts, setDrafts] = useState<Message[]>([]);
@@ -731,6 +932,8 @@ const ChatScreen = () => {
   const [showMenu, setShowMenu] = useState(false); // Add this line for dropdown menu state
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // --- Keyboard Handling ---
   useEffect(() => {
@@ -822,12 +1025,7 @@ const ChatScreen = () => {
     }
   }, [activeChat]);
 
-  // --- Retry Mechanism ---
-  const retryFetchChats = () => {
-    console.log("Retrying fetch chats...");
-    setError(null); // Clear any existing error before retrying
-    fetchChats();
-  };
+
 
   // --- Media Pickers and Recording ---
   const handleImagePicker = async () => {
@@ -844,20 +1042,29 @@ const ChatScreen = () => {
         allowsEditing: false,
         aspect: [1, 1],
         quality: 0.8,
+        allowsMultipleSelection: true, // Enable multiple selection
+        selectionLimit: 10, // Allow up to 10 media files
       });
-      if (!result.canceled && result.assets[0]) {
-        addDraft({
-          id: Date.now().toString(),
-          image: result.assets[0].uri,
-          messageType: "image",
-          sender: {
-            _id: user.id,
-            username: user.username,
-            fullName: user.fullName,
-            profilePicture: user.profilePicture,
-          },
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          isDraft: true,
+      if (!result.canceled && result.assets.length > 0) {
+        // Process all selected assets
+        result.assets.forEach((asset) => {
+          const isVideo = asset.mimeType?.startsWith('video') || asset.uri.toLowerCase().includes('.mp4') || asset.uri.toLowerCase().includes('.mov');
+          
+          // Add to drafts - don't auto-send
+          addDraft({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // Unique ID
+            image: isVideo ? undefined : asset.uri,
+            video: isVideo ? asset.uri : undefined,
+            messageType: isVideo ? "video" : "image",
+            sender: {
+              _id: user.id,
+              username: user.username,
+              fullName: user.fullName,
+              profilePicture: user.profilePicture,
+            },
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            isDraft: true,
+          });
         });
       }
     } catch (error) {
@@ -880,6 +1087,7 @@ const ChatScreen = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
+        // Add to drafts - don't auto-send
         addDraft({
           id: Date.now().toString(),
           image: result.assets[0].uri,
@@ -912,20 +1120,25 @@ const ChatScreen = () => {
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         allowsEditing: false,
         quality: 0.8,
+        allowsMultipleSelection: true, // Enable multiple selection
+        selectionLimit: 5, // Allow up to 5 videos
       });
-      if (!result.canceled && result.assets[0]) {
-        addDraft({
-          id: Date.now().toString(),
-          video: result.assets[0].uri,
-          messageType: "video",
-          sender: {
-            _id: user.id,
-            username: user.username,
-            fullName: user.fullName,
-            profilePicture: user.profilePicture,
-          },
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          isDraft: true,
+      if (!result.canceled && result.assets.length > 0) {
+        // Process all selected videos
+        result.assets.forEach((asset) => {
+          addDraft({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // Unique ID
+            video: asset.uri,
+            messageType: "video",
+            sender: {
+              _id: user.id,
+              username: user.username,
+              fullName: user.fullName,
+              profilePicture: user.profilePicture,
+            },
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            isDraft: true,
+          });
         });
       }
     } catch (error) {
@@ -948,6 +1161,7 @@ const ChatScreen = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
+        // Add to drafts - don't auto-send
         addDraft({
           id: Date.now().toString(),
           video: result.assets[0].uri,
@@ -975,33 +1189,38 @@ const ChatScreen = () => {
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: false,
         quality: 0.8,
+        allowsMultipleSelection: true, // Enable multiple selection
+        selectionLimit: 5, // Allow up to 5 audio files
       });
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        // Check if the selected file is an audio file (by extension only)
-        const isAudio = asset.uri.toLowerCase().includes('.mp3') ||
-                       asset.uri.toLowerCase().includes('.m4a') ||
-                       asset.uri.toLowerCase().includes('.wav') ||
-                       asset.uri.toLowerCase().includes('.aac') ||
-                       asset.uri.toLowerCase().includes('.ogg');
-        
-        if (isAudio) {
-          addDraft({
-            id: Date.now().toString(),
-            audio: asset.uri,
-            messageType: "audio",
-            sender: {
-              _id: user.id,
-              username: user.username,
-              fullName: user.fullName,
-              profilePicture: user.profilePicture,
-            },
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            isDraft: true,
-          });
-        } else {
-          Alert.alert("Invalid File", "Please select an audio file (MP3, M4A, WAV, AAC, OGG)");
-        }
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Process all selected assets
+        result.assets.forEach((asset) => {
+          // Check if the selected file is an audio file (by extension only)
+          const isAudio = asset.uri.toLowerCase().includes('.mp3') ||
+                         asset.uri.toLowerCase().includes('.m4a') ||
+                         asset.uri.toLowerCase().includes('.wav') ||
+                         asset.uri.toLowerCase().includes('.aac') ||
+                         asset.uri.toLowerCase().includes('.ogg');
+          
+          if (isAudio) {
+            // Add to drafts - don't auto-send
+            addDraft({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // Unique ID
+              audio: asset.uri,
+              messageType: "audio",
+              sender: {
+                _id: user.id,
+                username: user.username,
+                fullName: user.fullName,
+                profilePicture: user.profilePicture,
+              },
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isDraft: true,
+            });
+          } else {
+            Alert.alert("Invalid File", "Please select an audio file (MP3, M4A, WAV, AAC, OGG)");
+          }
+        });
       }
     } catch (error) {
       Alert.alert("Error", "Failed to pick audio");
@@ -1233,13 +1452,13 @@ const ChatScreen = () => {
 
   useEffect(() => {
     if (!activeChat || !token) return;
+    console.log("🔄 Active chat changed:", activeChat.id, activeChat.name);
     fetchMessages(activeChat.id);
     checkFollowStatus(activeChat.id);
   }, [activeChat, token]);
 
   const fetchChats = async () => {
     if (!token) {
-      setError("Authentication required. Please log in again.");
       return;
     }
     
@@ -1249,20 +1468,14 @@ const ChatScreen = () => {
     try {
       console.log("Fetching chats...");
       
-      // Add timeout to prevent hanging requests
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 10000)
-      );
-      
-      const fetchPromise = api.get("/chats");
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const response = await api.get("/chats");
       
       console.log("Chats response:", response.status);
       
       const { chats: chatData } = response.data;
       if (!Array.isArray(chatData)) {
         console.error("Invalid chat data format:", chatData);
-        setError("Invalid data format received from server");
+        setChats([]);
         return;
       }
       
@@ -1270,7 +1483,6 @@ const ChatScreen = () => {
       if (chatData.length === 0) {
         console.log("User has no chats yet");
         setChats([]);
-        setError(null);
         return;
       }
       
@@ -1288,33 +1500,10 @@ const ChatScreen = () => {
       
       console.log("Processed chats:", sortedChats.length);
       setChats(sortedChats);
-      setError(null);
     } catch (error: any) {
       console.error("Fetch chats error:", error);
-      let errorMessage = "Failed to fetch chats";
-      
-      if (error.message === 'Request timeout') {
-        errorMessage = "Request timed out. Please check your connection and try again.";
-      } else if (error.response) {
-        // Server responded with error status
-        if (error.response.status === 401) {
-          errorMessage = "Session expired. Please log in again.";
-        } else if (error.response.status === 403) {
-          errorMessage = "Access denied. Please check your permissions.";
-        } else if (error.response.status >= 500) {
-          errorMessage = "Server error. Please try again later.";
-        } else {
-          errorMessage = error.response.data?.message || `Server error (${error.response.status})`;
-        }
-      } else if (error.request) {
-        // Network error
-        errorMessage = "Network error. Please check your connection and try again.";
-      } else {
-        // Other error
-        errorMessage = error.message || "Unknown error occurred";
-      }
-      
-      setError(errorMessage);
+      // Silently handle errors - don't show error messages
+      setChats([]);
     } finally {
       setLoading(false);
     }
@@ -1323,11 +1512,34 @@ const ChatScreen = () => {
   const fetchMessages = async (chatId: string) => {
     if (!token) return;
     setLoading(true);
+    
     try {
+      console.log("📱 Fetching messages for chat:", chatId);
+      
       const response = await api.get(`/chats/${chatId}`);
+      
+      console.log("📱 Messages response:", response.status);
+      
       const { messages: messageData } = response.data;
+      
+      if (!Array.isArray(messageData)) {
+        console.error("Invalid message data format:", messageData);
+        setMessages([]);
+        return;
+      }
+      
       const formattedMessages: Message[] = messageData.map((msg: any): Message => {
         const parsedMessage = parsePostCommentMessage(msg.message || "");
+        
+        // Debug comment messages
+        if (parsedMessage.isPostComment) {
+          console.log("📝 Found comment message:", {
+            originalText: msg.message,
+            parsedData: parsedMessage,
+            messageType: msg.messageType
+          });
+        }
+        
         const message: Message = {
           id: msg._id,
           text: msg.message,
@@ -1343,6 +1555,7 @@ const ChatScreen = () => {
           isRead: msg.isRead || false,
           createdAt: msg.createdAt,
         };
+        
         // Set initial message status based on database read status
         if (message.sender._id === user?.id) {
           if (message.isRead) {
@@ -1353,6 +1566,7 @@ const ChatScreen = () => {
         }
         return message;
       });
+      
       // Find the last read message for positioning
       const lastReadMsg = formattedMessages
         .filter((msg: Message) => msg.sender._id !== user?.id && msg.isRead)
@@ -1364,11 +1578,11 @@ const ChatScreen = () => {
       
       setLastReadMessageId(lastReadMsg?.id || null);
       setMessages(formattedMessages);
+      
       try {
         await api.post(`/chats/${chatId}/mark-as-read`);
         setChats((prev: ChatItem[]) => prev.map((chat: ChatItem) => (chat.id === chatId ? { ...chat, unreadCount: 0 } : chat)));
       } catch {}
-      setError(null);
       
       // Smart scrolling: Scroll to unread messages if any, otherwise to last read message or bottom
       setTimeout(() => {
@@ -1397,7 +1611,9 @@ const ChatScreen = () => {
         setUnreadCount(0);
       }, 100);
     } catch (error: any) {
-      setError(error.response?.data?.message || "Failed to fetch messages");
+      console.error("📱 Fetch messages error:", error);
+      // Silently handle errors - don't show error messages
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -1552,7 +1768,7 @@ const ChatScreen = () => {
     }
   };
 
-  // --- Send Message with debounce and sending state ---
+  // --- Send Message with text and media together ---
   let sendTimeout: NodeJS.Timeout | null = null;
   const handleSendMessage = async () => {
     if (sending) return;
@@ -1560,47 +1776,105 @@ const ChatScreen = () => {
     if (!activeChat || !user) { setSending(false); return; }
     if (!messageText.trim() && drafts.length === 0) { setSending(false); return; }
 
-    // Send all drafts first
-    for (const draft of drafts) {
-      let messageType = draft.messageType;
-      let mediaUri = draft.image || draft.video || draft.audio || null;
-      const formData = new FormData();
-      formData.append("messageType", messageType);
-      if (mediaUri) {
-        let type = "image/jpeg";
-        let name = "chat-image.jpg";
-        if (messageType.includes("audio")) {
-          type = "audio/m4a";
-          name = "chat-audio.m4a";
-        } else if (messageType.includes("video")) {
-          type = "video/mp4";
-          name = "chat-video.mp4";
+    try {
+      // Send text and media together as one message
+      if (drafts.length > 0) {
+        // Handle multiple media files
+        const formData = new FormData();
+        
+        // Add text if present
+        if (messageText.trim()) {
+          formData.append("message", messageText.trim());
         }
-        formData.append("media", {
-          uri: mediaUri,
-          type,
-          name,
-        } as any);
-      }
-      try {
+        
+        // Process all drafts (multiple media files)
+        const mediaFiles = drafts.map((draft, index) => {
+          const mediaUri = draft.image || draft.video || draft.audio;
+          let type = "image/jpeg";
+          let name = `chat-media-${index}.jpg`;
+          
+          if (draft.messageType.includes("audio")) {
+            type = "audio/m4a";
+            name = `chat-audio-${index}.m4a`;
+          } else if (draft.messageType.includes("video")) {
+            type = "video/mp4";
+            name = `chat-video-${index}.mp4`;
+          }
+          
+          return {
+            uri: mediaUri,
+            type,
+            name,
+            messageType: draft.messageType
+          };
+        });
+        
+        // Add all media files to form data
+        mediaFiles.forEach((media, index) => {
+          if (media.uri) {
+            formData.append(`media`, {
+              uri: media.uri,
+              type: media.type,
+              name: media.name,
+            } as any);
+          }
+        });
+        
+        // Use the first media type as the primary message type
+        const primaryMessageType = mediaFiles[0]?.messageType || "image";
+        formData.append("messageType", primaryMessageType);
+        
+        // Send the message and wait for response
         const response = await api.post(`/chats/${activeChat.id}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${token}`,
           },
         });
-        // The server will emit a socket event with the saved message
-        // We don't need to add it to messages here as it will come via socket
-      } catch (error: any) {
-        setError(error.response?.data?.message || `Failed to send media: ${error.message}`);
-      }
-    }
-    setDrafts([]);
 
-    // Then send text message if any
-    if (messageText.trim()) {
-      try {
-        // Send text message to server via API
+        // Add message to local state immediately for instant feedback
+        if (response.data?.chat) {
+          // Group media files by type
+          const images = mediaFiles.filter(m => m.messageType === "image" && m.uri).map(m => m.uri!);
+          const videos = mediaFiles.filter(m => m.messageType === "video" && m.uri).map(m => m.uri!);
+          const audios = mediaFiles.filter(m => m.messageType === "audio" && m.uri).map(m => m.uri!);
+          
+          // Determine message type based on media count
+          let finalMessageType = primaryMessageType;
+          if (images.length + videos.length + audios.length > 1) {
+            finalMessageType = "multiple-media";
+          }
+          
+          const newMessage: Message = {
+            id: response.data.chat._id,
+            text: messageText.trim() || undefined,
+            // Include media URIs for immediate display
+            image: images.length === 1 ? images[0] : undefined,
+            video: videos.length === 1 ? videos[0] : undefined,
+            audio: audios.length === 1 ? audios[0] : undefined,
+            images: images.length > 1 ? images : undefined,
+            videos: videos.length > 1 ? videos : undefined,
+            audios: audios.length > 1 ? audios : undefined,
+            messageType: finalMessageType,
+            sender: {
+              _id: user.id,
+              username: user.username,
+              fullName: user.fullName,
+              profilePicture: user.profilePicture,
+            },
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            replyTo: replyingTo || undefined,
+          };
+          
+          setMessages((prev) => [...prev, newMessage]);
+        }
+
+        // Show success notification
+        setSuccessMessage("Message sent");
+        setShowSuccessNotification(true);
+        
+      } else if (messageText.trim()) {
+        // Send text-only message
         const response = await api.post(`/chats/${activeChat.id}`, {
           message: messageText.trim(),
           messageType: "text",
@@ -1612,36 +1886,38 @@ const ChatScreen = () => {
         });
 
         // Add message to local state
-        const newMessage: Message = {
-          id: response.data?.chat?._id || Date.now().toString(),
-          text: messageText.trim(),
-          messageType: "text",
-          sender: {
-            _id: user.id,
-            username: user.username,
-            fullName: user.fullName,
-            profilePicture: user.profilePicture,
-          },
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          replyTo: replyingTo || undefined,
-        };
-        
-        // Add message to local state immediately for instant feedback
-        setMessages((prev) => [...prev, newMessage]);
-        
-        // The server will emit the socket event after saving to database
-        setMessageText("");
-        setReplyingTo(null);
-        
-        // CRITICAL FIX: Clear typing indicator immediately when message is sent
-        handleTyping(false);
-      } catch (error: any) {
-        console.error("Failed to send text message:", error);
-        setError(error.response?.data?.message || `Failed to send message: ${error.message}`);
+        if (response.data?.chat) {
+          const newMessage: Message = {
+            id: response.data.chat._id,
+            text: messageText.trim(),
+            messageType: "text",
+            sender: {
+              _id: user.id,
+              username: user.username,
+              fullName: user.fullName,
+              profilePicture: user.profilePicture,
+            },
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            replyTo: replyingTo || undefined,
+          };
+          
+          setMessages((prev) => [...prev, newMessage]);
+        }
       }
+      
+      // Clear everything after successful send
+      setDrafts([]);
+      setMessageText("");
+      setReplyingTo(null);
+      handleTyping(false);
+      
+    } catch (error: any) {
+      console.error("Failed to send message:", error);
+      // Silently handle send errors
+    } finally {
+      if (sendTimeout) clearTimeout(sendTimeout);
+      sendTimeout = setTimeout(() => setSending(false), 500); // debounce
     }
-    if (sendTimeout) clearTimeout(sendTimeout);
-    sendTimeout = setTimeout(() => setSending(false), 500); // debounce
   };
 
   // --- Input UI Helpers ---
@@ -1746,7 +2022,69 @@ const ChatScreen = () => {
       ]}>
         {replyingTo && (
           <View style={[styles.replyPreview, { backgroundColor: colors.replyPreview, borderLeftWidth: 4, borderLeftColor: colors.iconFg, borderRadius: 8, padding: 6 }]}> 
-            <Text numberOfLines={1} style={{color: (replyingTo.sender && user && replyingTo.sender._id === user.id) ? colors.senderText : colors.receiverText, opacity: 0.6, fontStyle: 'italic'}}>{replyingTo.text || '📷 Image'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text numberOfLines={1} style={{color: (replyingTo.sender && user && replyingTo.sender._id === user.id) ? colors.senderText : colors.receiverText, opacity: 0.6, fontStyle: 'italic', flex: 1, marginRight: 8}}>{replyingTo.text || '📷 Image'}</Text>
+              <TouchableOpacity
+                onPress={() => setReplyingTo(null)}
+                style={{ padding: 4 }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <X size={16} color={colors.iconFg} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        
+        {/* Selected Media Preview */}
+        {drafts.length > 0 && (
+          <View style={styles.selectedMediaContainer}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+              <Text style={{ color: colors.chatroom.text, fontSize: 14, fontWeight: '500' }}>
+                {drafts.length} media file{drafts.length > 1 ? 's' : ''} selected
+              </Text>
+              <TouchableOpacity
+                onPress={() => setDrafts([])}
+                style={{ padding: 4 }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ color: colors.primary, fontSize: 14 }}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {drafts.map((draft, index) => (
+                <View key={draft.id} style={styles.selectedMediaItem}>
+                  {draft.image ? (
+                    <Image source={{ uri: draft.image }} style={styles.selectedMediaPreview as any} />
+                  ) : draft.video ? (
+                    <View style={styles.selectedMediaPreview}>
+                      <Video
+                        source={{ uri: draft.video }}
+                        style={{ width: 60, height: 60, borderRadius: 8 }}
+                        resizeMode={ResizeMode.COVER}
+                        shouldPlay={false}
+                        useNativeControls={false}
+                      />
+                      <View style={styles.playIconOverlay}>
+                        <Play size={16} color="white" />
+                      </View>
+                    </View>
+                  ) : draft.audio ? (
+                    <View style={[styles.selectedMediaPreview, { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
+                      <Music2 size={24} color="white" />
+                    </View>
+                  ) : null}
+                  <TouchableOpacity
+                    style={styles.removeSelectedMediaButton}
+                    onPress={() => removeDraft(draft.id)}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                  >
+                    <X size={16} color="white" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           </View>
         )}
         
@@ -1928,6 +2266,8 @@ const ChatScreen = () => {
       useNativeDriver: true,
     }).start();
   };
+
+
 
   const closeActionsModal = () => {
     Animated.timing(actionsAnim, {
@@ -2332,6 +2672,13 @@ const handleEdit = async () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.container, { backgroundColor: colors.chatroom.background, paddingTop: Platform.OS === 'ios' ? 32 : 0 }]}>
+        <SuccessNotification
+          visible={showSuccessNotification}
+          message={successMessage}
+          onHide={() => setShowSuccessNotification(false)}
+          duration={2000}
+          colors={colors}
+        />
         {loading && (
           <View style={[styles.loadingOverlay, { backgroundColor: "rgba(0,0,0,0.1)" }]}>
             <ActivityIndicator size="large" color={colors.chatroom.text} />
@@ -2609,22 +2956,13 @@ const handleEdit = async () => {
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.chatList}
               refreshing={loading}
-              onRefresh={retryFetchChats}
+              onRefresh={fetchChats}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Text style={[styles.emptyText, { color: colors.text }]}>
-                    {error ? error : "No conversations yet. Start chatting with someone!"}
+                    No conversations yet. Start chatting with someone!
                   </Text>
-                  {error && (
-                    <TouchableOpacity
-                      onPress={retryFetchChats}
-                      style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.retryText}>Try Again</Text>
-                    </TouchableOpacity>
-                  )}
-                  {!error && !loading && chats.length === 0 && (
+                  {!loading && chats.length === 0 && (
                     <Text style={[styles.emptyText, { color: colors.grey, fontSize: 14, marginTop: 10 }]}>
                       Start a conversation by following someone or commenting on their posts!
                     </Text>
@@ -2781,6 +3119,22 @@ const handleEdit = async () => {
                         flatListRef.current?.scrollToIndex({ index, animated: true });
                       }, 100);
                     }}
+                    ListEmptyComponent={
+                      loading ? (
+                        <View style={styles.emptyContainer}>
+                          <ActivityIndicator size="large" color={colors.chatroom.text} />
+                          <Text style={[styles.emptyText, { color: colors.chatroom.text, marginTop: 16 }]}>
+                            Loading messages...
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.emptyContainer}>
+                          <Text style={[styles.emptyText, { color: colors.chatroom.text }]}>
+                            No messages yet. Start the conversation!
+                          </Text>
+                        </View>
+                      )
+                    }
                   />
 
                   {showScrollToBottom && (
@@ -2835,14 +3189,7 @@ const handleEdit = async () => {
           </View>
         )}
 
-        {error && (
-          <View style={[styles.errorContainer, { backgroundColor: colors.error }]}>
-            <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
-            <TouchableOpacity onPress={() => setError(null)} style={styles.dismissError}>
-              <Text style={[styles.dismissText, { color: colors.primary }]}>Dismiss</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        
       </View>
 
       {showForwardModal && (
@@ -3243,45 +3590,51 @@ const styles: import("react-native").StyleSheet.NamedStyles<any> = StyleSheet.cr
     textAlign: "center",
     marginBottom: 20,
   },
-  retryButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  retryText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  errorContainer: {
-    position: "absolute",
-    bottom: 140,
-    left: 16,
-    right: 16,
-    padding: 12,
-    borderRadius: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    elevation: 5,
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 14,
-  },
-  dismissError: {
-    marginLeft: 12,
-  },
-  dismissText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
+
   scrollToBottom: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+  },
+  selectedMediaContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  selectedMediaItem: {
+    position: "relative",
+  },
+  selectedMediaPreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: "#f0f0f0",
+  },
+  removeSelectedMediaButton: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  playIconOverlay: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -8 }, { translateY: -8 }],
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   attachmentModalOverlay: {
     flex: 1,
@@ -3367,6 +3720,105 @@ const styles: import("react-native").StyleSheet.NamedStyles<any> = StyleSheet.cr
     fontSize: 12,
     fontWeight: '500',
     paddingHorizontal: 8,
+  },
+  // Post Comment Preview Styles
+  postPreviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  postPreviewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  postDetailsContainer: {
+    flex: 1,
+    padding: 8,
+    borderRadius: 8,
+  },
+  postLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  postCaption: {
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  postTimestamp: {
+    fontSize: 11,
+    opacity: 0.7,
+  },
+  commentContainer: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  commentLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  commentText: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  // Multiple Media Styles
+  multipleMediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  mediaGridItem: {
+    position: 'relative',
+    marginBottom: 6,
+  },
+  multipleMediaImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  multipleMediaVideo: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: "#000",
+  },
+  downloadButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioGridItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 8,
+    padding: 8,
+    width: 200,
+  },
+  audioPreview: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  audioInfo: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  audioText: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 

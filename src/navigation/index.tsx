@@ -36,6 +36,8 @@ import SettingsScreen from "../screens/Settings/index"
 import NotificationScreen from "../screens/Settings/Notification"
 import FAQsScreen from "../screens/Settings/FAQs"
 import SupportScreen from "../screens/Settings/Support"
+import TermsScreen from "../screens/Settings/Terms"
+import PrivacyScreen from "../screens/Settings/Privacy"
 
 import type { RootStackParamList, TabNavigatorParamList, SettingsStackParamList } from "../types/navigation"
 
@@ -161,6 +163,8 @@ function AuthStack() {
       <Stack.Screen name="SignUp" component={SignUp} />
       <Stack.Screen name="Verify" component={Verify} />
       <Stack.Screen name="ChangePassword" component={ChangePassword} />
+      <Stack.Screen name="Terms" component={TermsScreen} />
+      <Stack.Screen name="Privacy" component={PrivacyScreen} />
     </Stack.Navigator>
   )
 }

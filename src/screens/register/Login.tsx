@@ -130,8 +130,18 @@ const Login: React.FC = () => {
               <View style={styles.termsContainer}>
                 <Text style={[styles.termsText, { color: colors.text }]}>
                   By continuing you agree with Feeda{" "}
-                  <Text style={[styles.link, { color: colors.icon }]}>terms of agreement</Text> and{" "}
-                  <Text style={[styles.link, { color: colors.icon }]}>privacy policy</Text>
+                  <Text 
+                    style={[styles.link, { color: colors.icon }]}
+                    onPress={() => navigation.navigate("Terms")}
+                  >
+                    terms of agreement
+                  </Text> and{" "}
+                  <Text 
+                    style={[styles.link, { color: colors.icon }]}
+                    onPress={() => navigation.navigate("Privacy")}
+                  >
+                    privacy policy
+                  </Text>
                 </Text>
               </View>
             </View>

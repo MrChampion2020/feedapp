@@ -11,6 +11,8 @@ export type RootStackParamList = {
   Chat: { userId?: string }
   UserProfile: { userId: string }
   PostView: { post?: any; postId?: string; activeHashtag?: string }
+  Terms: undefined
+  Privacy: undefined
 }
 
 export type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "HomeTab">

@@ -13,10 +13,11 @@ import {
   Image,
   Animated,
   StatusBar,
+  ScrollView,
 } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { useTheme } from "../../contexts/ThemeContext"
-import { Sparkles, Heart, Users, ArrowRight, ChevronLeft, ChevronRight, Play, Pause } from "lucide-react-native"
+import { ArrowRight } from "lucide-react-native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../../types/navigation"
 
@@ -29,70 +30,132 @@ const screens = [
     id: 1,
     title: "Share Memes\nWith Friends",
     subtitle: "Express Yourself",
-    // description: "Post and share your favorite memes with the Feeda community and make everyone laugh!",
-    icon: Sparkles,
-    gradient: ["#FF6B6B", "#4ECDC4"],
+    description: "Create and share hilarious memes with your friends. Let your creativity shine and make everyone laugh with your unique sense of humor.",
     image: require("../../assets/images/meme.jpg"),
-    // features: ["Upload instantly", "Smart filters", "Viral potential"],
   },
   {
     id: 2,
     title: "React and\nChat",
     subtitle: "Connect Instantly",
-    // description: "Like, comment, and chat privately with Feeda creators in real-time conversations!",
-    icon: Heart,
-    gradient: ["#A8E6CF", "#FFD93D"],
+    description: "React to posts with emojis and start meaningful conversations. Build connections through shared interests and engaging discussions.",
     image: require("../../assets/images/reacted.png"),
-    // features: ["Real-time chat", "Emoji reactions", "Voice messages"],
   },
   {
     id: 3,
     title: "Follow\nCreators",
     subtitle: "Stay Updated",
-    // description: "Follow your favorite Feeda creators and never miss their latest hilarious content!",
-    icon: Users,
-    gradient: ["#FFB6C1", "#87CEEB"],
+    description: "Follow your favorite creators and never miss their latest content. Get notified about new posts and stay connected with the community.",
     image: require("../../assets/images/soc.png"),
-    // features: ["Personalized feed", "Push notifications", "Creator insights"],
   },
 ]
 
 const Onboard: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState(0)
-  const [isAutoPlay, setIsAutoPlay] = useState(true)
+  const [progress, setProgress] = useState(0)
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  const [isUserScrolling, setIsUserScrolling] = useState(false)
   const navigation = useNavigation<OnboardScreenNavigationProp>()
   const { colors, theme } = useTheme()
+  const scrollViewRef = useRef<ScrollView>(null)
 
   // Animation values
-  const slideAnim = useRef(new Animated.Value(0)).current
   const fadeAnim = useRef(new Animated.Value(1)).current
-  const scaleAnim = useRef(new Animated.Value(1)).current
-  const progressAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(0)).current
+  const imageScaleAnim = useRef(new Animated.Value(1)).current
+  const imageRotateAnim = useRef(new Animated.Value(0)).current
+  const buttonProgressAnim = useRef(new Animated.Value(0)).current
+  const buttonScaleAnim = useRef(new Animated.Value(1)).current
+  const titleAnim = useRef(new Animated.Value(0)).current
+  const subtitleAnim = useRef(new Animated.Value(0)).current
 
-  // Auto-advance with progress animation
+  // Auto-advance with 15-second duration
   useEffect(() => {
-    if (!isAutoPlay) return
+    if (!isAutoPlaying || isUserScrolling) return
 
-    const interval = setInterval(() => {
-      if (currentScreen < screens.length - 1) {
-        goToNext()
-      } else {
-        goToScreen(0)
+    const duration = 15000 // 15 seconds
+    const interval = 50 // Update every 50ms for smoother progress
+    const steps = duration / interval
+    let currentStep = 0
+
+    // Reset progress at start
+    setProgress(0)
+    buttonProgressAnim.setValue(0)
+
+    const progressInterval = setInterval(() => {
+      currentStep++
+      const newProgress = (currentStep / steps) * 100
+      setProgress(newProgress)
+
+      // Button fills in 2 seconds (first 2 seconds of 15-second cycle)
+      const buttonProgress = Math.min(1, (currentStep * interval) / 2000)
+      Animated.timing(buttonProgressAnim, {
+        toValue: buttonProgress,
+        duration: interval,
+        useNativeDriver: true,
+      }).start()
+
+      if (currentStep >= steps) {
+        // Complete the screen
+        if (currentScreen < screens.length - 1) {
+          goToNext()
+        } else {
+          // Reset to first screen
+          goToScreen(0)
+        }
+        setProgress(0)
+        buttonProgressAnim.setValue(0)
       }
-    }, 5000)
-
-    // Progress animation
-    Animated.timing(progressAnim, {
-      toValue: 1,
-      duration: 5000,
-      useNativeDriver: false,
-    }).start()
+    }, interval)
 
     return () => {
-      clearInterval(interval)
-      progressAnim.setValue(0)
+      clearInterval(progressInterval)
     }
-  }, [currentScreen, isAutoPlay])
+  }, [currentScreen, isAutoPlaying, isUserScrolling])
+
+  // Image and text animation on screen change
+  useEffect(() => {
+    // Reset animations
+    titleAnim.setValue(0)
+    subtitleAnim.setValue(0)
+    imageScaleAnim.setValue(1)
+    imageRotateAnim.setValue(0)
+
+    // Animate image with reverse scale and rotation
+    Animated.parallel([
+      Animated.timing(imageScaleAnim, {
+        toValue: 0.8,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(imageRotateAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+    ]).start()
+
+    // Animate text elements in sequence
+    Animated.sequence([
+      Animated.timing(titleAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(subtitleAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start()
+
+    // Scroll to current screen only if not user scrolling
+    if (!isUserScrolling && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        x: currentScreen * width,
+        animated: true,
+      })
+    }
+  }, [currentScreen, isUserScrolling])
 
   const goToNext = () => {
     if (currentScreen < screens.length - 1) {
@@ -100,15 +163,14 @@ const Onboard: React.FC = () => {
     }
   }
 
-  const goToPrev = () => {
-    if (currentScreen > 0) {
-      goToScreen(currentScreen - 1)
-    }
-  }
-
   const goToScreen = (index: number) => {
     setCurrentScreen(index)
-    progressAnim.setValue(0)
+    setProgress(0)
+    setIsAutoPlaying(true)
+    setIsUserScrolling(false)
+
+    // Reset button progress immediately
+    buttonProgressAnim.setValue(0)
 
     // Smooth transition animation
     Animated.sequence([
@@ -117,19 +179,14 @@ const Onboard: React.FC = () => {
         duration: 150,
         useNativeDriver: true,
       }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 150,
+      Animated.timing(slideAnim, {
+        toValue: index * width,
+        duration: 0,
         useNativeDriver: true,
       }),
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 200,
+        duration: 300,
         useNativeDriver: true,
       }),
     ]).start()
@@ -143,19 +200,216 @@ const Onboard: React.FC = () => {
     navigation.navigate("Login")
   }
 
+  const handleButtonPress = () => {
+    // Add button press animation
+    Animated.sequence([
+      Animated.timing(buttonScaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start()
+
+    // Immediate response - no waiting for animation
+    if (currentScreen === screens.length - 1) {
+      handleGetStarted()
+    } else {
+      goToNext()
+    }
+  }
+
+  const handleScrollBegin = () => {
+    setIsUserScrolling(true)
+    setIsAutoPlaying(false)
+  }
+
+  const handleScrollEnd = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x
+    const screenIndex = Math.round(offsetX / width)
+    
+    if (screenIndex !== currentScreen) {
+      setCurrentScreen(screenIndex)
+    }
+    
+    // Resume auto-play after a short delay
+    setTimeout(() => {
+      setIsUserScrolling(false)
+      setIsAutoPlaying(true)
+    }, 1000)
+  }
+
   const toggleAutoPlay = () => {
-    setIsAutoPlay(!isAutoPlay)
-    if (isAutoPlay) {
-      progressAnim.setValue(0)
+    setIsAutoPlaying(!isAutoPlaying)
+    if (!isAutoPlaying) {
+      setProgress(0)
+      Animated.timing(buttonProgressAnim, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true,
+      }).start()
     }
   }
 
   const currentScreenData = screens[currentScreen]
-  const IconComponent = currentScreenData.icon
+
+  // Custom animated text component for letter-by-letter color change
+  const AnimatedText = ({ text, progress }: { text: string; progress: number }) => {
+    return (
+      <View style={{ flexDirection: 'row' }}>
+        {text.split('').map((char, index) => {
+          // All text changes to white at 20% fill
+          const isCovered = progress >= 0.2;
+          
+          return (
+            <Text
+              key={index}
+              style={[
+                styles.actionText,
+                {
+                  color: isCovered ? "white" : "black",
+                }
+              ]}
+            >
+              {char}
+            </Text>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // Animated arrow icon
+  const AnimatedArrow = ({ progress }: { progress: number }) => {
+    const arrowAnim = useRef(new Animated.Value(0)).current;
+    
+    useEffect(() => {
+      if (progress >= 0.2) {
+        Animated.timing(arrowAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        arrowAnim.setValue(0);
+      }
+    }, [progress]);
+
+    return (
+      <Animated.View
+        style={{
+          transform: [
+            {
+              translateX: arrowAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 5],
+              }),
+            },
+          ],
+        }}
+      >
+        <ArrowRight 
+          size={20} 
+          color={progress >= 0.2 ? "white" : "black"}
+          style={styles.arrowIcon} 
+        />
+      </Animated.View>
+    );
+  };
+
+  // Render individual screen
+  const renderScreen = (screen: any, index: number) => (
+    <View key={index} style={[styles.screenContainer, { width }]}>
+      {/* Animated Image */}
+      <View style={styles.imageContainer}>
+        <Animated.Image 
+          source={screen.image} 
+          style={[
+            styles.image,
+            {
+              transform: [
+                {
+                  scale: imageScaleAnim,
+                },
+                {
+                  rotate: imageRotateAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '-5deg'],
+                  }),
+                },
+              ],
+            },
+          ]} 
+          resizeMode="cover" 
+        />
+        
+        {/* Progress Dots at bottom of image */}
+        <View style={styles.imageProgressContainer}>
+          {screens.map((_, dotIndex) => (
+            <TouchableOpacity key={dotIndex} onPress={() => goToScreen(dotIndex)}>
+              <View
+                style={[
+                  styles.progressDot,
+                  {
+                    backgroundColor: dotIndex === currentScreen ? colors.primary : colors.border,
+                    width: dotIndex === currentScreen ? 24 : 8,
+                  },
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Content */}
+      <View style={styles.textSection}>
+        {/* Animated Title */}
+        <Animated.Text 
+          style={[
+            styles.title, 
+            { 
+              color: colors.text,
+              opacity: titleAnim,
+              transform: [{
+                translateY: titleAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                })
+              }]
+            }
+          ]}
+        >
+          {screen.title}
+        </Animated.Text>
+
+        {/* Animated Subtitle */}
+        <Animated.Text 
+          style={[
+            styles.subtitle, 
+            { 
+              color: colors.primary,
+              opacity: subtitleAnim,
+              transform: [{
+                translateY: subtitleAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [15, 0],
+                })
+              }]
+            }
+          ]}
+        >
+          {screen.subtitle}
+        </Animated.Text>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      {/* Enhanced Status Bar */}
       <StatusBar
         barStyle={theme === "dark" ? "light-content" : "dark-content"}
         backgroundColor={colors.background}
@@ -163,148 +417,68 @@ const Onboard: React.FC = () => {
       />
 
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Header */}
+        {/* Skip Button */}
         <View style={styles.header}>
-          <TouchableOpacity style={[styles.skipButton, { borderColor: colors.border }]} onPress={handleSkip}>
-            <Text style={[styles.skipText, { color: colors.text }]}>Skip</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.autoPlayButton, { backgroundColor: colors.card }]} onPress={toggleAutoPlay}>
-            {isAutoPlay ? <Pause size={20} color={colors.text} /> : <Play size={20} color={colors.text} />}
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <Text style={[styles.skipText, { color: colors.placeholder }]}>Skip</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Main Content */}
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }],
-            },
-          ]}
-        >
-          {/* Icon and Subtitle */}
-          <View style={styles.iconContainer}>
-            <View style={[styles.iconWrapper, { backgroundColor: colors.primary + "20" }]}>
-              <IconComponent size={32} color={colors.primary} />
-            </View>
-            <Text style={[styles.subtitle, { color: colors.primary }]}>{currentScreenData.subtitle}</Text>
-          </View>
+        {/* Main Content with Horizontal Scroll */}
+        <View style={styles.content}>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScrollBeginDrag={handleScrollBegin}
+            onMomentumScrollEnd={handleScrollEnd}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.scrollContent}
+            decelerationRate="normal"
+            snapToInterval={width}
+            snapToAlignment="center"
+            bounces={false}
+          >
+            {screens.map((screen, index) => renderScreen(screen, index))}
+          </ScrollView>
+        </View>
 
-          {/* Image Container with Progress Lines at Bottom */}
-          <View style={styles.imageSection}>
-            <View style={styles.imageContainer}>
-              <Image source={currentScreenData.image} style={styles.image} resizeMode="cover" />
-              <View style={[styles.imageOverlay, { backgroundColor: colors.background + "40" }]} />
-            </View>
-
-            {/* Progress Lines at Bottom of Image */}
-            <View style={styles.progressContainer}>
-              {screens.map((_, index) => (
-                <View key={index} style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                  <Animated.View
-                    style={[
-                      styles.progressFill,
-                      {
-                        backgroundColor: colors.primary,
-                        width:
-                          index === currentScreen
-                            ? progressAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: ["0%", "100%"],
-                              })
-                            : index < currentScreen
-                              ? "100%"
-                              : "0%",
-                      },
-                    ]}
-                  />
-                </View>
-              ))}
-            </View>
-
-            {/* Navigation Arrows Below Image */}
-            <View style={styles.imageNavigation}>
-              <TouchableOpacity
-                style={[
-                  styles.navButton,
-                  {
-                    backgroundColor: colors.primary,
-                    opacity: currentScreen === 0 ? 0.3 : 1,
-                  },
-                ]}
-                onPress={goToPrev}
-                disabled={currentScreen === 0}
-              >
-                <ChevronLeft size={24} color="white" />
-              </TouchableOpacity>
-
-              <View style={styles.pagination}>
-                {screens.map((_, index) => (
-                  <TouchableOpacity key={index} onPress={() => goToScreen(index)}>
-                    <View
-                      style={[
-                        styles.paginationDot,
-                        {
-                          backgroundColor: index === currentScreen ? colors.primary : colors.border,
-                          width: index === currentScreen ? 24 : 8,
-                        },
-                      ]}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.navButton,
-                  {
-                    backgroundColor: colors.primary,
-                    opacity: currentScreen === screens.length - 1 ? 0.3 : 1,
-                  },
-                ]}
-                onPress={goToNext}
-                disabled={currentScreen === screens.length - 1}
-              >
-                <ChevronRight size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Text Content */}
-          <View style={[styles.textContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.title, { color: colors.text }]}>{currentScreenData.title}</Text>
-            <Text style={[styles.description, { color: colors.placeholder }]}>{currentScreenData.description}</Text>
-
-            {/* Features */}
-            {/* <View style={styles.featuresContainer}>
-              {currentScreenData.features.map((feature, index) => (
-                <View key={index} style={styles.featureItem}>
-                  {/* <View style={[styles.featureDot, { backgroundColor: colors.primary }]} /> */}
-                  {/* <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text> */}
-                {/* </View> */}
-              {/* ))} */}
-            {/* </View> */} 
-          </View>
-        </Animated.View>
-
-        {/* Action Button */}
-        <View style={styles.actionContainer}>
-          {currentScreen === screens.length - 1 ? (
+        {/* Bottom Section */}
+        <View style={styles.bottomSection}>
+          {/* Progress-based Action Button */}
+          <View style={styles.buttonContainer}>
+            <Animated.View
+              style={[
+                styles.buttonProgress,
+                {
+                  backgroundColor: colors.primary,
+                  transform: [{
+                    scaleX: buttonProgressAnim,
+                  }],
+                  borderRadius: buttonProgressAnim._value > 0 ? 16 : 0,
+                },
+              ]}
+            />
             <TouchableOpacity
-              style={[styles.getStartedButton, { backgroundColor: colors.primary }]}
-              onPress={handleGetStarted}
+              style={[
+                styles.actionButton,
+                {
+                  transform: [{ scale: buttonScaleAnim }],
+                },
+              ]}
+              onPress={handleButtonPress}
+              activeOpacity={0.8}
             >
-              <Text style={[styles.getStartedText, { color: "white" }]}>Get Started</Text>
-              <ArrowRight size={20} color="white" style={styles.arrowIcon} />
+              <AnimatedText 
+                text={currentScreen === screens.length - 1 ? "Get Started" : "Next"}
+                progress={buttonProgressAnim._value}
+              />
+              <AnimatedArrow 
+                progress={buttonProgressAnim._value}
+              />
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={[styles.nextButton, { borderColor: colors.primary }]} onPress={goToNext}>
-              <Text style={[styles.nextText, { color: colors.primary }]}>Next</Text>
-              <ArrowRight size={16} color={colors.primary} style={styles.arrowIcon} />
-            </TouchableOpacity>
-          )}
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -317,236 +491,105 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 10,
-    justifyContent: "space-between",
-    paddingTop: 5
+    paddingHorizontal: 24,
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: Platform.OS === "ios" ? 10 : 20,
-    paddingBottom: 2,
+    justifyContent: "flex-end",
+    paddingTop: Platform.OS === "ios" ? 5 : 10,
+    paddingBottom: 10,
   },
   skipButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
   },
   skipText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
-  },
-  autoPlayButton: {
-    padding: 8,
-    borderRadius: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-    
   },
   content: {
     flex: 1,
-    paddingBottom: 2,
-  },
-  iconContainer: {
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  iconWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
     justifyContent: "center",
+  },
+  scrollContent: {
     alignItems: "center",
-    marginBottom: 5,
+  },
+  screenContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: width,
+  },
+  imageContainer: {
+    position: "relative",
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: "hidden",
+    width: width - 48, // Account for container padding
+    height: height * 0.6,
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+  },
+  imageProgressContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  progressDot: {
+    height: 8,
+    borderRadius: 4,
+  },
+  textSection: {
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 12,
+    lineHeight: 36,
   },
   subtitle: {
     fontSize: 14,
     fontWeight: "600",
+    textAlign: "center",
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  imageSection: {
-    marginBottom: 20,
+  bottomSection: {
+    paddingBottom: Platform.OS === "ios" ? 40 : 30,
   },
-  imageContainer: {
+  buttonContainer: {
     position: "relative",
-    borderRadius: 20,
     overflow: "hidden",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
   },
-  image: {
-    width: "100%",
-    height: height * 0.45, // Increased height from 0.3 to 0.45
-    borderRadius: 20,
-  },
-  imageOverlay: {
+  buttonProgress: {
     position: "absolute",
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    height: 60,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    bottom: 0,
+    zIndex: 1,
   },
-  progressContainer: {
+  actionButton: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 5,
-    marginBottom: 5,
-  },
-  progressBar: {
-    flex: 1,
-    height: 3,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 2,
-  },
-  imageNavigation: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  navButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  pagination: {
-    flexDirection: "row",
+    paddingVertical: 18,
+    backgroundColor: "transparent",
     gap: 8,
-    alignItems: "center",
+    zIndex: 2,
   },
-  paginationDot: {
-    height: 8,
-    borderRadius: 4,
-    transition: "all 0.3s ease",
-  },
-  textContainer: {
-    padding: 5,
-    borderRadius: 20,
-    marginBottom: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 30,
-    lineHeight: 40,
-  },
-  description: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  featuresContainer: {
-    gap: 12,
-  },
-  featureItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  featureDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  featureText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  actionContainer: {
-    paddingBottom: Platform.OS === "ios" ? 20 : 20,
-    paddingTop: 20,
-  },
-  getStartedButton: {
-    flexDirection: "row",
-    marginTop: 10,
-    
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  getStartedText: {
+  actionText: {
     fontSize: 18,
     fontWeight: "700",
-  },
-  nextButton: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 2,
-    gap: 8,
-    marginTop: 10
-  },
-  nextText: {
-    fontSize: 16,
-    fontWeight: "600",
   },
   arrowIcon: {
     marginLeft: 4,

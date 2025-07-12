@@ -23,6 +23,7 @@ import { useAuth, api } from "../../contexts/AuthContext"
 import { useTheme } from "../../contexts/ThemeContext"
 import { getUserVerificationStatus } from "../../utils/userUtils"
 import VerifiedBadge from "../../components/VerifiedBadge"
+import SuccessNotification from "../../components/SuccessNotification"
 import { Audio, Video, ResizeMode } from "expo-av"
 import {
   Heart,
@@ -141,9 +142,11 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
   const [isFollowing, setIsFollowing] = useState(false)
   const [shareModalVisible, setShareModalVisible] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [selectedMedia, setSelectedMedia] = useState<string | null>(null)
   const [isMediaModalVisible, setIsMediaModalVisible] = useState(false)
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
 
   const [likeSound, setLikeSound] = useState<Audio.Sound | null>(null)
   const [commentSound, setCommentSound] = useState<Audio.Sound | null>(null)
@@ -355,7 +358,7 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
   }
 
   const handleComment = async () => {
-    if (!commentText.trim() && !selectedImage) return
+    if (!commentText.trim() && !selectedMedia) return
     if (!post || !user) return
 
     try {
@@ -367,28 +370,37 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
       }
       formData.append("userId", user.id)
 
-      if (selectedImage) {
-        formData.append("image", {
-          uri: selectedImage,
-          type: "image/jpeg",
-          name: "comment-image.jpg",
+      if (selectedMedia) {
+        // Determine file type and name based on the selected image
+        const isVideo = selectedMedia.toLowerCase().includes('.mp4') || selectedMedia.toLowerCase().includes('.mov')
+        const fileType = isVideo ? 'video/mp4' : 'image/jpeg'
+        const fileName = isVideo ? 'comment-video.mp4' : 'comment-image.jpg'
+        
+        formData.append("media", {
+          uri: selectedMedia,
+          type: fileType,
+          name: fileName,
         } as any)
       }
 
-      const response = await api.post(`/posts/${post._id}/comment`, formData, {
+      // Background upload - don't await, let it happen in background
+      api.post(`/posts/${post._id}/comment`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-      })
+      }).then((response) => {
+        const newComment = response.data.comment
 
-      const newComment = response.data.comment
-
-      setPost((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          comments: [...prev.comments, newComment],
-        }
+        setPost((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            comments: [...prev.comments, newComment],
+          }
+        })
+      }).catch((error: any) => {
+        console.error("Background comment upload failed:", error);
+        // Don't show error to user for background uploads
       })
 
       if (post.user._id !== user.id) {
@@ -424,8 +436,9 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
       }
 
       setCommentText("")
-      setSelectedImage(null)
-      Alert.alert("Success", "Comment posted successfully!")
+      setSelectedMedia(null)
+      setSuccessMessage("Comment added")
+      setShowSuccessNotification(true)
     } catch (error: any) {
       console.error("Error adding comment:", {
         status: error.response?.status || "Unknown",
@@ -436,22 +449,25 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
       if (error.response?.status === 401 || error.response?.status === 403) {
         try {
           await refreshToken()
-          const retryResponse = await api.post(`/posts/${post._id}/comment`, {
+          // Background retry upload
+          api.post(`/posts/${post._id}/comment`, {
             text: commentText.trim(),
           }, {
             headers: {
               "Content-Type": "application/json",
             },
-          })
+          }).then((retryResponse) => {
+            const newComment = retryResponse.data.comment
 
-          const newComment = retryResponse.data.comment
-
-          setPost((prev) => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              comments: [...prev.comments, newComment],
-            }
+            setPost((prev) => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                comments: [...prev.comments, newComment],
+              }
+            })
+          }).catch((retryError: any) => {
+            console.error("Background retry comment upload failed:", retryError);
           })
 
           if (post.user._id !== user.id) {
@@ -487,8 +503,9 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
           }
 
           setCommentText("")
-          setSelectedImage(null)
-          Alert.alert("Success", "Comment posted successfully!")
+          setSelectedMedia(null)
+          setSuccessMessage("Comment added")
+          setShowSuccessNotification(true)
         } catch (refreshError: any) {
           console.error("Token refresh failed:", refreshError)
           Alert.alert("Session Expired", "Please log in again.", [
@@ -573,27 +590,27 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
     }
   }
 
-  const handleImagePicker = async () => {
+  const handleMediaPicker = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Please grant camera roll permissions to send images.")
+        Alert.alert("Permission needed", "Please grant camera roll permissions to send media.")
         return
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       })
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0].uri)
+        setSelectedMedia(result.assets[0].uri)
       }
     } catch (error) {
-      console.error("Error picking image:", error)
-      Alert.alert("Error", "Failed to pick image")
+      console.error("Error picking media:", error)
+      Alert.alert("Error", "Failed to pick media")
     }
   }
 
@@ -606,13 +623,14 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       })
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0].uri)
+        setSelectedMedia(result.assets[0].uri)
       }
     } catch (error) {
       console.error("Error taking photo:", error)
@@ -675,16 +693,34 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
           <View style={styles.commentHeader}>
             <View style={styles.commentUsernameRow}>
               <Text style={[styles.commentUsername, { color: colors.text }]}>{comment.user.username}</Text>
-              {(() => {
-                const { isVerified, isPremiumVerified } = getUserVerificationStatus(comment.user._id)
-                return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
-              })()}
+              <View style={styles.commentBadgeSpacing}>
+                {(() => {
+                  const { isVerified, isPremiumVerified } = getUserVerificationStatus(comment.user._id)
+                  return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                })()}
+              </View>
             </View>
-            <Text style={[styles.commentTime, { color: colors.secondary }]}>
-              {formatTimeAgo(comment.createdAt)}
-            </Text>
+            <View style={styles.commentTimeContainer}>
+              <Text style={[styles.commentTime, { color: colors.secondary }]}>
+                {formatTimeAgo(comment.createdAt)}
+              </Text>
+            </View>
           </View>
-          {comment.image && <Image source={{ uri: comment.image }} style={styles.commentImage} />}
+          {comment.image && (
+            <View style={styles.commentMediaContainer}>
+              {comment.image.toLowerCase().includes('.mp4') || comment.image.toLowerCase().includes('.mov') ? (
+                <Video
+                  source={{ uri: comment.image }}
+                  style={styles.commentVideo}
+                  useNativeControls
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={false}
+                />
+              ) : (
+                <Image source={{ uri: comment.image }} style={styles.commentImage} />
+              )}
+            </View>
+          )}
           <Text style={[styles.commentText, { color: colors.text }]}>{comment.text}</Text>
           <View style={styles.commentActions}>
             <TouchableOpacity
@@ -776,6 +812,13 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SuccessNotification
+        visible={showSuccessNotification}
+        message={successMessage}
+        onHide={() => setShowSuccessNotification(false)}
+        duration={2000}
+        colors={colors}
+      />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -794,13 +837,15 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
               style={styles.userAvatar}
             />
             <View style={styles.userInfo}>
-                            <View style={styles.userNameRow}>
-              <Text style={[styles.username, { color: colors.text }]}>{post.user.username}</Text>
-                {(() => {
-                  const { isVerified, isPremiumVerified } = getUserVerificationStatus(post.user._id)
-                  return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={16} />
-                })()}
-                <Text style={[styles.fullName, { color: colors.secondary, marginLeft: 8 }]}>{post.user.fullName}</Text>
+              <View style={styles.userNameRow}>
+                <Text style={[styles.username, { color: colors.text }]}>{post.user.username}</Text>
+                <View style={styles.userBadgeSpacing}>
+                  {(() => {
+                    const { isVerified, isPremiumVerified } = getUserVerificationStatus(post.user._id)
+                    return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={16} />
+                  })()}
+                </View>
+                <Text style={[styles.fullName, { color: colors.secondary, marginLeft: 12 }]}>{post.user.fullName}</Text>
               </View>
             </View>
             {post.user._id !== user?.id && (
@@ -855,8 +900,8 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
               )}
             </View>
           ) : (
-            <View style={styles.mediaContainer}>
-              <Text style={[styles.caption, { color: colors.text, textAlign: 'center', padding: 24 }]}>{post.caption}</Text>
+            <View style={[styles.textOnlyContainer, { backgroundColor: colors.card }]}>
+              <Text style={[styles.caption, { color: colors.text, textAlign: 'left', padding: 20 }]}>{post.caption}</Text>
             </View>
           )}
 
@@ -914,17 +959,27 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
         <View
           style={[styles.commentInputContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}
         >
-          {selectedImage && (
+          {selectedMedia && (
             <View style={styles.selectedImageContainer}>
-              <Image source={{ uri: selectedImage }} style={styles.selectedImagePreview} />
-              <TouchableOpacity onPress={() => setSelectedImage(null)} style={styles.removeImageButton}>
+              {selectedMedia.toLowerCase().includes('.mp4') || selectedMedia.toLowerCase().includes('.mov') ? (
+                <Video
+                  source={{ uri: selectedMedia }}
+                  style={styles.selectedImagePreview}
+                  useNativeControls
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={false}
+                />
+              ) : (
+                <Image source={{ uri: selectedMedia }} style={styles.selectedImagePreview} />
+              )}
+              <TouchableOpacity onPress={() => setSelectedMedia(null)} style={styles.removeImageButton}>
                 <CloseIcon size={16} color="white" />
               </TouchableOpacity>
             </View>
           )}
           <View style={styles.inputRow}>
             <TouchableOpacity
-              onPress={handleImagePicker}
+              onPress={handleMediaPicker}
               style={[styles.mediaButton, { backgroundColor: colors.card }]}
             >
               <ImageIcon size={20} color={colors.icon} />
@@ -948,11 +1003,11 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
               onPress={handleComment}
               style={[
                 styles.commentSubmitButton,
-                { backgroundColor: commentText.trim() || selectedImage ? colors.primary : colors.border },
+                { backgroundColor: commentText.trim() || selectedMedia ? colors.primary : colors.border },
               ]}
-              disabled={!commentText.trim() && !selectedImage}
+              disabled={!commentText.trim() && !selectedMedia}
             >
-              <Send size={20} color={commentText.trim() || selectedImage ? "white" : colors.secondary} />
+              <Send size={20} color={commentText.trim() || selectedMedia ? "white" : colors.secondary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1248,6 +1303,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginRight: 8,
   },
+  commentBadgeSpacing: {
+    marginLeft: 4, // Add some space between username and badge
+  },
+  commentTimeContainer: {
+    flex: 1, // Allow time to take available space
+  },
   commentTime: {
     fontSize: 12,
   },
@@ -1450,6 +1511,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginLeft: 16,
+  },
+  textOnlyContainer: {
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  userBadgeSpacing: {
+    marginLeft: 12, // Add some space between username and badge
+  },
+  commentMediaContainer: {
+    width: '100%',
+    height: 150, // Fixed height for media preview
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginVertical: 8,
+    backgroundColor: '#000', // Ensure background is dark for video
+  },
+  commentVideo: {
+    width: '100%',
+    height: '100%',
   },
 })
 

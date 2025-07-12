@@ -33,10 +33,8 @@ const Verify: React.FC = () => {
     try {
       setIsLoading(true)
       await verifyOtp(email, values.otp)
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "Home" }],
-      })
+      // After verification, the user will be authenticated and automatically redirected to Main
+      // No need to manually navigate - the AuthContext will handle the redirect
     } catch (err: any) {
       setError(err.message || "Verification failed")
     } finally {
