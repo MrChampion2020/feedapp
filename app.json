@@ -43,7 +43,6 @@
          "expo-av",
          "expo-image-picker",
          "expo-local-authentication",
-         "expo-media-library",
          "expo-dev-client"
        ]
      }

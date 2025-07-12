@@ -207,7 +207,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ navigation }) =
                 <Text style={[styles.senderName, { color: colors.text }]}>{item.sender?.fullName || item.sender?.username}</Text>
                 {(() => {
                   const { isVerified, isPremiumVerified } = getUserVerificationStatus(item.sender?._id || "")
-                  return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                                          return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
                 })()}
               </View>
               <Text style={[styles.notificationMessage, { color: colors.text }]}>{item.message}</Text>
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     marginBottom: 115.5
   },
   header: {
-    paddingTop: StatusBar.currentHeight || 44,
+    paddingTop: StatusBar.currentHeight || 2,
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 0.3,

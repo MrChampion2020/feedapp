@@ -743,7 +743,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
           <Text style={[styles.userName, { color: colors.text }]}>{item.fullName}</Text>
           {(() => {
             const { isVerified, isPremiumVerified } = getUserVerificationStatus(item._id)
-            return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                                    return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
           })()}
         </View>
         <Text style={[styles.userUsername, { color: colors.text }]}>@{item.username}</Text>
@@ -815,7 +815,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
               
                           <View style={styles.userNameRow}>
                 <Text style={[styles.fullName, { color: colors.text }]}>{item.user.fullName}</Text>
-                <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                                    <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
               <Text style={[styles.username, { color: colors.text, marginLeft: 8 }]}>@{item.user.username}</Text>
               <Text style={[styles.timestamp, { color: colors.text }]}>·</Text>
               <Text style={[styles.timestamp, { color: colors.text }]}>{formatTimeAgo(item.createdAt)}</Text>

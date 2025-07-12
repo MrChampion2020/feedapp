@@ -378,7 +378,7 @@ const SettingsScreen = () => {
                 <Text style={[styles.profileName, { color: "#FFFFFF" }]}>{profile?.fullName || "User"}</Text>
                 {(() => {
                   const { isVerified, isPremiumVerified } = getUserVerificationStatus(profile?.id || "")
-                  return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={16} />
+                                          return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
                 })()}
               </View>
               <Text style={[styles.usernameText, { color: "#FFFFFF" }]}>@{profile?.username}</Text>

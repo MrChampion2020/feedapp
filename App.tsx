@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar"
 import { View } from "react-native"
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, createContext, useContext } from "react"
 import { View as RNView, Text, AppState, type AppStateStatus, Platform } from "react-native"
 import { AuthProvider } from "./src/contexts/AuthContext"
 import { ThemeProvider } from "./src/contexts/ThemeContext"
@@ -11,6 +11,15 @@ import { AppLockScreen } from "./src/components/LockScreen"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
+
+// StatusBar Context
+const StatusBarContext = createContext<{
+  setStatusBarStyle: (style: "light" | "dark") => void;
+}>({
+  setStatusBarStyle: () => {},
+});
+
+export const useStatusBar = () => useContext(StatusBarContext);
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -53,6 +62,7 @@ export default function App() {
   const [showBlankScreen, setShowBlankScreen] = useState(false)
   const [showAppLock, setShowAppLock] = useState(false)
   const appState = useRef(AppState.currentState)
+  const [statusBarStyle, setStatusBarStyle] = useState<"light" | "dark">("dark")
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", handleAppStateChange)
@@ -89,20 +99,22 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        <StatusBar style="dark" />
+        <StatusBar style={statusBarStyle} />
         <GestureHandlerRootView style={{ flex: 1 }}>
           <ErrorBoundary>
-            <ThemeProvider>
-              <AuthProvider>
-                <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-                  <AppNavigator />
-                </SafeAreaView>
-                {/* Blank screen overlay when app is in background */}
-                <BlankScreenOverlay visible={showBlankScreen} />
-                {/* App lock screen */}
-                <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
-              </AuthProvider>
-            </ThemeProvider>
+            <StatusBarContext.Provider value={{ setStatusBarStyle }}>
+              <ThemeProvider>
+                <AuthProvider>
+                  <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                    <AppNavigator />
+                  </SafeAreaView>
+                  {/* Blank screen overlay when app is in background */}
+                  <BlankScreenOverlay visible={showBlankScreen} />
+                  {/* App lock screen */}
+                  <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
+                </AuthProvider>
+              </ThemeProvider>
+            </StatusBarContext.Provider>
           </ErrorBoundary>
         </GestureHandlerRootView>
       </View>

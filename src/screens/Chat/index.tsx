@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -276,7 +276,7 @@ const VoiceNoteWaveform = ({
   );
 };
 
-const MessageItem = ({
+const MessageItem = React.memo(({
   item,
   user,
   colors,
@@ -810,42 +810,51 @@ const MessageItem = ({
       </Animated.View>
     </PanGestureHandler>
   );
-};
+});
 
 const SOCKET_URL = API_URL.replace(/\/api$/, '');
 
-// Add message grouping utility with unread support
+// Add message grouping utility with unread support - Optimized version
 const groupMessagesByDate = (messages: Message[] = [], userId?: string) => {
   const groups: { [key: string]: Message[] } = {};
-  if (!Array.isArray(messages)) return groups;
+  if (!Array.isArray(messages) || messages.length === 0) return groups;
   
-  // Separate unread and read messages
+  // Use a more efficient approach with Map for better performance
+  const groupMap = new Map<string, Message[]>();
+  
+  // Pre-calculate dates for better performance
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const todayString = today.toDateString();
+  const yesterdayString = yesterday.toDateString();
+  
+  // Separate unread and read messages in one pass
   const unreadMessages: Message[] = [];
   const readMessages: Message[] = [];
   
-  messages.forEach((message: Message) => {
+  for (const message of messages) {
     if (message.sender._id !== userId && !message.isRead) {
       unreadMessages.push(message);
     } else {
       readMessages.push(message);
     }
-  });
+  }
   
   // Group unread messages if any exist
   if (unreadMessages.length > 0) {
-    groups['Unread Messages'] = unreadMessages;
+    groupMap.set('Unread Messages', unreadMessages);
   }
   
-  // Group read messages by date
-  readMessages.forEach((message: Message) => {
+  // Group read messages by date with optimized date checking
+  for (const message of readMessages) {
     const date = message.createdAt ? new Date(message.createdAt) : new Date();
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    let dateKey = '';
-    if (date.toDateString() === today.toDateString()) {
+    const dateString = date.toDateString();
+    
+    let dateKey: string;
+    if (dateString === todayString) {
       dateKey = 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
+    } else if (dateString === yesterdayString) {
       dateKey = 'Yesterday';
     } else {
       dateKey = date.toLocaleDateString('en-US', {
@@ -855,13 +864,15 @@ const groupMessagesByDate = (messages: Message[] = [], userId?: string) => {
         day: 'numeric',
       });
     }
-    if (!groups[dateKey]) {
-      groups[dateKey] = [];
+    
+    if (!groupMap.has(dateKey)) {
+      groupMap.set(dateKey, []);
     }
-    groups[dateKey].push(message);
-  });
+    groupMap.get(dateKey)!.push(message);
+  }
   
-  return groups;
+  // Convert Map back to object
+  return Object.fromEntries(groupMap);
 };
 
 // Date separator component with unread support
@@ -1373,7 +1384,6 @@ const ChatScreen = () => {
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
             console.error('❌ Failed to upload voice note:', error, error?.response);
             Alert.alert('Voice Note Upload Failed', error.response?.data?.message || error.message);
-            setError(error.response?.data?.message || `Failed to send voice note: ${error.message}`);
           }
         }
         recording.current = null;
@@ -1463,7 +1473,6 @@ const ChatScreen = () => {
     }
     
     setLoading(true);
-    setError(null);
     
     try {
       console.log("Fetching chats...");
@@ -1528,44 +1537,63 @@ const ChatScreen = () => {
         return;
       }
       
-      const formattedMessages: Message[] = messageData.map((msg: any): Message => {
-        const parsedMessage = parsePostCommentMessage(msg.message || "");
+      // Batch process messages for better performance
+      const formattedMessages: Message[] = [];
+      const newMessageStatus: {[key: string]: string} = {};
+      
+      // Process messages in batches to avoid blocking the UI
+      const batchSize = 50;
+      for (let i = 0; i < messageData.length; i += batchSize) {
+        const batch = messageData.slice(i, i + batchSize);
         
-        // Debug comment messages
-        if (parsedMessage.isPostComment) {
-          console.log("📝 Found comment message:", {
-            originalText: msg.message,
-            parsedData: parsedMessage,
-            messageType: msg.messageType
-          });
-        }
-        
-        const message: Message = {
-          id: msg._id,
-          text: msg.message,
-          image: msg.image,
-          audio: msg.audio,
-          video: msg.video,
-          messageType: parsedMessage.isPostComment
-            ? "post-comment"
-            : msg.messageType || "text",
-          sender: msg.sender,
-          timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          postData: parsedMessage.isPostComment ? parsedMessage.postData : undefined,
-          isRead: msg.isRead || false,
-          createdAt: msg.createdAt,
-        };
-        
-        // Set initial message status based on database read status
-        if (message.sender._id === user?.id) {
-          if (message.isRead) {
-            setMessageStatus((prev) => ({ ...prev, [message.id]: 'read' }));
-          } else {
-            setMessageStatus((prev) => ({ ...prev, [message.id]: 'delivered' }));
+        batch.forEach((msg: any) => {
+          // Only parse post comment messages when needed (lazy parsing)
+          let messageType = msg.messageType || "text";
+          let postData = undefined;
+          
+          // Only parse if it looks like a comment message (contains specific patterns)
+          if (msg.message && (msg.message.includes('[img]') || msg.message.includes('Comment:'))) {
+            const parsedMessage = parsePostCommentMessage(msg.message);
+            if (parsedMessage.isPostComment) {
+              messageType = "post-comment";
+              postData = parsedMessage.postData;
+            }
           }
+          
+          const message: Message = {
+            id: msg._id,
+            text: msg.message,
+            image: msg.image,
+            audio: msg.audio,
+            video: msg.video,
+            messageType,
+            sender: msg.sender,
+            timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            postData,
+            isRead: msg.isRead || false,
+            createdAt: msg.createdAt,
+          };
+          
+          formattedMessages.push(message);
+          
+          // Batch message status updates
+          if (message.sender._id === user?.id) {
+            if (message.isRead) {
+              newMessageStatus[message.id] = 'read';
+            } else {
+              newMessageStatus[message.id] = 'delivered';
+            }
+          }
+        });
+        
+        // Allow UI to update between batches
+        if (i + batchSize < messageData.length) {
+          await new Promise(resolve => setTimeout(resolve, 0));
         }
-        return message;
-      });
+      }
+      
+      // Batch update message status
+      setMessageStatus(prev => ({ ...prev, ...newMessageStatus }));
       
       // Find the last read message for positioning
       const lastReadMsg = formattedMessages
@@ -1579,6 +1607,7 @@ const ChatScreen = () => {
       setLastReadMessageId(lastReadMsg?.id || null);
       setMessages(formattedMessages);
       
+      // Mark as read in background
       try {
         await api.post(`/chats/${chatId}/mark-as-read`);
         setChats((prev: ChatItem[]) => prev.map((chat: ChatItem) => (chat.id === chatId ? { ...chat, unreadCount: 0 } : chat)));
@@ -1927,56 +1956,24 @@ const ChatScreen = () => {
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  // // --- UI Renderers ---
-  // const renderTextWithLinks = (text: string, textColor?: string) => {
-  //   if (!text || typeof text !== 'string') {
-  //     return <Text key="empty" style={{ color: textColor }}> </Text>;
-  //   }
-    
-  //   const parts = text.split(URL_REGEX);
-  //   const elements: React.ReactNode[] = [];
-    
-  //   parts.forEach((part, index) => {
-  //     if (!part) {
-  //       elements.push(<Text key={index} style={{ color: textColor }}> </Text>);
-  //       return;
-  //     }
-      
-  //     if (URL_REGEX.test(part)) {
-  //       elements.push(
-  //         <Text
-  //           key={index}
-  //           style={[styles.linkText, { color: colors.chatroom.link }]}
-  //           onPress={() => Linking.openURL(part.startsWith("http") ? part : `https://${part}`)}
-  //         >
-  //           {part}
-  //         </Text>
-  //       );
-  //     } else {
-  //       elements.push(<Text key={index} style={{ color: textColor }}>{part}</Text>);
-  //     }
-  //   });
-    
-  //   // Use View to wrap multiple Text components instead of nesting Text inside Text
-  //   return (
-  //     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-  //       {elements}
-  //     </View>
-  //   );
-  // };
 
 
-  const renderTextWithLinks = (text: string, textColor?: string): React.ReactElement => {
+
+    const renderTextWithLinks = (text: string, textColor?: string): React.ReactElement => {
     try {
       if (!text || typeof text !== 'string') {
-        return <Text style={{ color: textColor }}> </Text>; // ✅ fallback
+        return <Text style={{ color: textColor }}> </Text>;
       }
-    
+      
       const parts = text.split(URL_REGEX);
       const elements: React.ReactElement[] = [];
-    
+      
       parts.forEach((part, index) => {
-        if (!part) return;
+        if (!part) {
+          elements.push(<Text key={`empty-${index}`} style={{ color: textColor }}> </Text>);
+          return;
+        }
+        
         if (URL_REGEX.test(part)) {
           elements.push(
             <Text
@@ -1993,7 +1990,7 @@ const ChatScreen = () => {
           );
         }
       });
-    
+      
       return (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {elements}
@@ -2236,6 +2233,19 @@ const ChatScreen = () => {
   // --- Messages with drafts ---
   const allMessages = [...messages, ...drafts];
 
+  // Memoize the grouped messages data to prevent unnecessary re-computations
+  const groupedMessagesData = useMemo(() => {
+    const groups = groupMessagesByDate(allMessages, user?.id);
+    const flatData: (Message | { type: 'date'; date: string })[] = [];
+    
+    Object.entries(groups).forEach(([date, dateMessages]) => {
+      flatData.push({ type: 'date', date });
+      flatData.push(...(Array.isArray(dateMessages) ? dateMessages : []));
+    });
+    
+    return flatData;
+  }, [allMessages, user?.id]);
+
   // Test function to verify audio playback
   const testAudioPlayback = async () => {
     try {
@@ -2431,7 +2441,7 @@ const handleEdit = async () => {
     }
   }, [showScrollToBottom]);
 
-  // Render messages with date grouping
+    // Render messages with date grouping
   const renderMessageWithDate = ({ item, index }: { item: any; index: number }): React.ReactElement => {
     try {
       // Defensive: If item is not an object or is a string/array, always return a <Text> error
@@ -2635,7 +2645,7 @@ const handleEdit = async () => {
     return `${Math.floor(diffInSeconds / 31536000)}year`
   }
 
-  // Defensive wrapper for FlatList renderItem
+    // Defensive wrapper for FlatList renderItem
   function safeRenderItem(renderFn: (props: any) => React.ReactNode): (props: any) => React.ReactElement {
     return function(props: any): React.ReactElement {
       try {
@@ -2933,7 +2943,7 @@ const handleEdit = async () => {
                       <Text style={[styles.chatName, { color: colors.text }]}>{item.fullName || item.name}</Text>
                       {(() => {
                         const { isVerified, isPremiumVerified } = getUserVerificationStatus(item.id)
-                        return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                        return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
                       })()}
                     </View>
                     <Text style={[styles.chatUsername, { color: colors.grey }]}>@{item.name}</Text>
@@ -3027,7 +3037,7 @@ const handleEdit = async () => {
                       <Text style={[styles.headerChatName, { color: colors.text }]}>{(activeChat.fullName || activeChat.name).split(' ')[0]}</Text>
                       {(() => {
                         const { isVerified, isPremiumVerified } = getUserVerificationStatus(activeChat.id)
-                        return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={12} />
+                        return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
                       })()}
                     </View>
                   </View>
@@ -3065,18 +3075,7 @@ const handleEdit = async () => {
                 >
                   <FlatList
                     ref={flatListRef}
-                    data={(() => {
-                      const allMessages: Message[] = [...(messages || []), ...(drafts || [])];
-                      const groups: { [key: string]: Message[] } = groupMessagesByDate(allMessages, user?.id) || {};
-                      const flatData: (Message | { type: 'date'; date: string })[] = [];
-                      if (groups && typeof groups === 'object') {
-                        Object.entries(groups).forEach(([date, dateMessages]) => {
-                          flatData.push({ type: 'date', date });
-                          flatData.push(...(Array.isArray(dateMessages) ? dateMessages : []));
-                        });
-                      }
-                      return flatData;
-                    })()}
+                    data={groupedMessagesData}
                     renderItem={safeRenderItem(({ item }: any) => 
                       renderMessageWithDate({ item, index: item.id })
                     )}
@@ -3088,6 +3087,15 @@ const handleEdit = async () => {
                     }}
                     contentContainerStyle={styles.messageList}
                     showsVerticalScrollIndicator={true}
+                    removeClippedSubviews={true}
+                    maxToRenderPerBatch={10}
+                    windowSize={10}
+                    initialNumToRender={20}
+                    getItemLayout={(data, index) => ({
+                      length: 80, // Approximate height of each message item
+                      offset: 80 * index,
+                      index,
+                    })}
                     onContentSizeChange={() => {
                       if (isAtBottom.current) {
                         flatListRef.current?.scrollToEnd({ animated: true });

@@ -1,6 +1,5 @@
 import React from "react"
-import { View, StyleSheet } from "react-native"
-import Svg, { Circle, Path } from "react-native-svg"
+import { View, Text, StyleSheet } from "react-native"
 import { useTheme } from "../contexts/ThemeContext"
 
 interface VerifiedBadgeProps {
@@ -16,31 +15,38 @@ const VerifiedBadge: React.FC<VerifiedBadgeProps> = ({ isVerified, isPremiumVeri
   if (!isVerified && !isPremiumVerified) return null
 
   const badgeColor = isPremiumVerified ? "#FFD700" : "#1DA1F2"
-  // Check color: black for dark theme, white for light theme
   const dynamicCheckColor = checkColor || (theme === "dark" ? "#000" : "#fff")
+  
+  // Make the background container smaller based on the size prop
+  const containerSize = Math.max(size + 2, 8) // Minimum 8px, otherwise size + 2px padding
+  const checkmarkSize = Math.min(size, 14) // Cap checkmark at 14px max
 
   return (
-    <View style={[styles.container, style]}>
-      <Svg width={size} height={size} viewBox="0 0 32 32">
-        <Circle cx="16" cy="16" r="16" fill={badgeColor} />
-        <Path
-          d="M10 17l4 4 8-8"
-          fill="none"
-          stroke={dynamicCheckColor}
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
+    <View style={[
+      styles.container, 
+      { 
+        backgroundColor: badgeColor,
+        width: containerSize,
+        height: containerSize,
+        borderRadius: containerSize / 2,
+      }, 
+      style
+    ]}>
+      <Text style={[styles.checkmark, { color: dynamicCheckColor, fontSize: checkmarkSize }]}>
+        ✓
+      </Text>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginLeft: 4,
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: 4,
+  },
+  checkmark: {
+    fontWeight: "bold",
   },
 })
 

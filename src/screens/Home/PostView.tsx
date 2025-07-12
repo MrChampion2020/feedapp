@@ -842,7 +842,7 @@ const PostView: React.FC<PostViewProps> = ({ route, navigation }) => {
                 <View style={styles.userBadgeSpacing}>
                   {(() => {
                     const { isVerified, isPremiumVerified } = getUserVerificationStatus(post.user._id)
-                    return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={16} />
+                                            return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
                   })()}
                 </View>
                 <Text style={[styles.fullName, { color: colors.secondary, marginLeft: 12 }]}>{post.user.fullName}</Text>

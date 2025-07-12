@@ -330,7 +330,7 @@ const UserProfileScreen: React.FC = () => {
                   <Text style={[styles.fullName, { color: colors.text }]}>{profile.fullName}</Text>
                   {(() => {
                     const { isVerified, isPremiumVerified } = getUserVerificationStatus(profile._id)
-                    return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={16} />
+                                            return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
                   })()}
                 </View>
                 <Text style={[styles.username, { color: colors.text }]}>@{profile.username}</Text>

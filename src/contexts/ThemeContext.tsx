@@ -93,6 +93,7 @@ interface ThemeContextType {
   colors: ThemeColors;
   toggleTheme: () => void;
   setTheme: (theme: ThemeType) => void;
+  setStatusBarStyle: (style: "light" | "dark") => void;
 }
 
 const lightColors: ThemeColors = {
@@ -241,9 +242,19 @@ export const useTheme = () => {
   return context;
 };
 
+// StatusBar Context
+const StatusBarContext = createContext<{
+  setStatusBarStyle: (style: "light" | "dark") => void;
+}>({
+  setStatusBarStyle: () => {},
+});
+
+export const useStatusBar = () => useContext(StatusBarContext);
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const systemColorScheme = useColorScheme();
   const [theme, setThemeState] = useState<ThemeType>("light");
+  const [statusBarStyle, setStatusBarStyleState] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
     const loadTheme = async () => {
@@ -314,9 +325,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     colors,
     toggleTheme,
     setTheme,
+    setStatusBarStyle: setStatusBarStyleState,
   };
 
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
+  return (
+    <StatusBarContext.Provider value={{ setStatusBarStyle: setStatusBarStyleState }}>
+      <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
+    </StatusBarContext.Provider>
+  );
 };
 
 

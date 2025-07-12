@@ -188,7 +188,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
   const [commentLoading, setCommentLoading] = useState(false)
   const [likeSound, setLikeSound] = useState<Audio.Sound | null>(null)
   const [commentSound, setCommentSound] = useState<Audio.Sound | null>(null)
-  const [sendSound, setSendSound] = useState<Audio.Sound | null>(null)
+
   const [likeAnimations, setLikeAnimations] = useState<{ [key: string]: Animated.Value }>({})
   const [likeCountAnimations, setLikeCountAnimations] = useState<{ [key: string]: Animated.Value }>({})
   const [likeBounceAnimations, setLikeBounceAnimations] = useState<{ [key: string]: Animated.Value }>({})
@@ -208,12 +208,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
   useEffect(() => {
     const loadSounds = async () => {
       try {
-        const { sound: likeAudio } = await Audio.Sound.createAsync(require("../../assets/sounds/like.mp3"))
-        const { sound: commentAudio } = await Audio.Sound.createAsync(require("../../assets/sounds/comment.mp3"))
-        const { sound: sendAudio } = await Audio.Sound.createAsync(require("../../assets/sounds/send.mp3"))
+              const { sound: likeAudio } = await Audio.Sound.createAsync(require("../../assets/sounds/like.mp3"))
+      const { sound: commentAudio } = await Audio.Sound.createAsync(require("../../assets/sounds/comment.mp3"))
         setLikeSound(likeAudio)
         setCommentSound(commentAudio)
-        setSendSound(sendAudio)
       } catch (error) {
         console.log("Sound files not found, continuing without sounds:", error)
       }
@@ -222,7 +220,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
     return () => {
       likeSound?.unloadAsync()
       commentSound?.unloadAsync()
-      sendSound?.unloadAsync()
     }
   }, [])
 
@@ -554,7 +551,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
     try {
       setCommentLoading(true)
       await playSound(commentSound)
-      await playSound(sendSound)
+
       const response = await api.post(`/posts/${selectedPostId}/comment`, { text: commentText.trim() })
       setPosts((prev) =>
         prev.map((post) =>
@@ -861,7 +858,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
             <View style={styles.userInfo}>
               <View style={styles.userNameRow}>
                 <Text style={[styles.fullName, { color: colors.text, fontSize: 14, fontWeight: "500" }]}>{item.user.fullName}</Text>
-                <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} style={{ marginLeft: 2 }} />
+                                        <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} style={{ marginLeft: 2 }} />
                 <Text style={[styles.username, { color: colors.text, marginLeft: 4, fontSize: 13 }]}>@{item.user.username}</Text>
                 <Text style={[styles.timestamp, { color: colors.text }]}>·</Text>
                 <Text style={[styles.timestamp, { color: colors.text }]}>{formatTimeAgo(item.createdAt)}</Text>
