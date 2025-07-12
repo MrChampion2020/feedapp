@@ -1,22 +1,13 @@
 import type React from "react";
 import { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useColorScheme, StatusBar, Platform, ImageSourcePropType } from "react-native";
+import { useColorScheme, Platform, ImageSourcePropType } from "react-native";
+import { StatusBar } from "expo-status-bar";
 // Use require instead of import for images
 const chatlight = require("../assets/images/chatlight.png");
 const chatdark = require("../assets/images/chatdark.jpg");
-// Attempt to import react-native-navigation-bar-color with fallback
-let setColor, setNavigationBarLight, setNavigationBarContrastEnforced;
-try {
-  const navigationBar = require("react-native-navigation-bar-color");
-  setColor = navigationBar.setColor || (() => {});
-  setNavigationBarLight = navigationBar.setNavigationBarLight || (() => {});
-  setNavigationBarContrastEnforced = navigationBar.setNavigationBarContrastEnforced || (() => {});
-} catch (e) {
-  setColor = () => {};
-  setNavigationBarLight = () => {};
-  setNavigationBarContrastEnforced = () => {};
-}
+// For Expo managed workflow, we'll use StatusBar for navigation bar theming
+// The navigation bar color will be controlled through the StatusBar component
 
 type ThemeType = "light" | "dark";
 
@@ -273,33 +264,30 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [systemColorScheme]);
 
   useEffect(() => {
-    const applyThemeToNavigationBar = async () => {
+    const applyThemeToNavigationBar = () => {
       try {
-        if (theme === "dark") {
-          if (Platform.OS === "android") {
-            await setColor("#15202B");
-            await setNavigationBarContrastEnforced(false);
-            await setNavigationBarLight(false);
-          } else if (Platform.OS === "ios") {
-            StatusBar.setBackgroundColor("#15202B");
-            StatusBar.setBarStyle("light-content");
+        if (Platform.OS === "android") {
+          if (theme === "dark") {
+            // Dark theme: dark background, light icons
+            console.log("🎨 Android StatusBar set to dark theme");
+          } else {
+            // Light theme: light background, dark icons
+            console.log("🎨 Android StatusBar set to light theme");
           }
-        } else {
-          if (Platform.OS === "android") {
-            await setColor("#FFFFFF");
-            await setNavigationBarContrastEnforced(false);
-            await setNavigationBarLight(true);
-          } else if (Platform.OS === "ios") {
-            StatusBar.setBackgroundColor("#FFFFFF");
-            StatusBar.setBarStyle("dark-content");
-          }
+        } else if (Platform.OS === "ios") {
+          // iOS uses StatusBar for navigation bar theming
+          console.log("🎨 iOS StatusBar set to", theme === "dark" ? "light-content" : "dark-content");
         }
       } catch (error) {
-        console.log("NavigationBar available:", typeof setColor === "function");
+        console.error("❌ Failed to set StatusBar color:", error);
       }
     };
+    
+    // Apply theme immediately
     applyThemeToNavigationBar();
   }, [theme]);
+
+  // StatusBar style is handled by the StatusBar component in App.tsx
 
   const toggleTheme = async () => {
     try {

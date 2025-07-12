@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Pressable, Platform } from "react-native"
 import { Eye, EyeOff } from "lucide-react-native"
 import { Formik } from "formik"
@@ -12,6 +12,7 @@ import { useAuth } from "../../contexts/AuthContext"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../../types/navigation"
 import * as Device from "expo-device"
+import { useStatusBar } from "../../../App"
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">
 
@@ -26,7 +27,13 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const navigation = useNavigation<LoginScreenNavigationProp>()
   const { login } = useAuth()
-  const { colors } = useTheme()
+  const { colors, theme } = useTheme()
+  const { setStatusBarStyle } = useStatusBar()
+
+  // Update StatusBar style based on theme
+  useEffect(() => {
+    setStatusBarStyle(theme === "dark" ? "light" : "dark")
+  }, [theme, setStatusBarStyle])
 
   const handleLogin = async (values: { identifier: string; password: string }) => {
     setError("")
@@ -75,7 +82,11 @@ const Login: React.FC = () => {
               <View style={styles.inputContainer}>
                 <Text style={[styles.label, { color: colors.text }]}>Username or Email</Text>
                 <TextInput
-                  style={[styles.input, touched.identifier && errors.identifier && styles.inputError]}
+                  style={[
+                    styles.input, 
+                    { color: colors.text, backgroundColor: colors.card },
+                    touched.identifier && errors.identifier && styles.inputError
+                  ]}
                   placeholder="Enter username or email"
                   placeholderTextColor={colors.placeholder}
                   value={values.identifier}
@@ -91,7 +102,11 @@ const Login: React.FC = () => {
                 <Text style={[styles.label, { color: colors.text }]}>Password</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
-                    style={[styles.passwordInput, touched.password && errors.password && styles.inputError]}
+                    style={[
+                      styles.passwordInput, 
+                      { color: colors.text, backgroundColor: colors.card },
+                      touched.password && errors.password && styles.inputError
+                    ]}
                     placeholder="Enter password"
                     placeholderTextColor={colors.placeholder}
                     value={values.password}
@@ -194,7 +209,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#E0E0E0",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -211,7 +225,6 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#E0E0E0",
     borderRadius: 8,
   },
   passwordInput: {

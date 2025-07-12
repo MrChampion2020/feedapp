@@ -294,7 +294,7 @@ const MessageItem = React.memo(({
   colors: any;
   handleSwipeGesture: (event: any, message: Message) => void;
   renderTextWithLinks: (text: string, textColor?: string) => any;
-  flatListRef: React.RefObject<FlatList<any>>;
+  flatListRef: any;
   onRemoveDraft?: (id: string) => void;
   onLongPress?: (message: Message) => void;
   selectedMessage?: Message | null;
@@ -924,27 +924,34 @@ const ChatScreen = () => {
   const isStoppingRef = useRef(false);
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [actionsMessage, setActionsMessage] = useState<Message | null>(null);
-  const [actionsY, setActionsY] = useState(0);
-  const actionsAnim = useRef(new Animated.Value(0)).current;
-  const [showForwardModal, setShowForwardModal] = useState(false);
-  const [forwardSelected, setForwardSelected] = useState<string[]>([]);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showInfoModal, setShowInfoModal] = useState(false);
-  const [messageInfo, setMessageInfo] = useState<any>(null);
-  const [editText, setEditText] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [followers, setFollowers] = useState<any[]>([]);
-  const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
-  const [sending, setSending] = useState(false); // Add sending state
-  const [isVoiceRecording, setIsVoiceRecording] = useState(false); // For voice recording indicator
-  const [voiceRecordingUser, setVoiceRecordingUser] = useState<{username: string, fullName: string} | null>(null); // Store voice recording user info
-  const inputRef = useRef<TextInput>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Add typing timeout ref
-  const [showMenu, setShowMenu] = useState(false); // Add this line for dropdown menu state
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  const [voiceRecordingUser, setVoiceRecordingUser] = useState<{username: string, fullName: string} | null>(null);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [forwardSelected, setForwardSelected] = useState<string[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [messageInfo, setMessageInfo] = useState<any>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollAnim = useRef(new Animated.Value(0)).current;
+  const [showMenu, setShowMenu] = useState(false);
+
+  // Add error state for better error handling
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [socketError, setSocketError] = useState<string | null>(null);
+  
+  // Add missing state variables
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [actionsY, setActionsY] = useState(0);
+  const actionsAnim = useRef(new Animated.Value(0)).current;
 
   // --- Keyboard Handling ---
   useEffect(() => {
@@ -1469,49 +1476,71 @@ const ChatScreen = () => {
 
   const fetchChats = async () => {
     if (!token) {
+      console.log("No token available for fetching chats");
       return;
     }
     
     setLoading(true);
+    setChatError(null);
     
     try {
-      console.log("Fetching chats...");
+      console.log("📱 Fetching chats...");
       
       const response = await api.get("/chats");
       
-      console.log("Chats response:", response.status);
+      console.log("📱 Chats response:", response.status);
       
       const { chats: chatData } = response.data;
-      if (!Array.isArray(chatData)) {
-        console.error("Invalid chat data format:", chatData);
+      
+      // Validate response data
+      if (!response.data || !Array.isArray(chatData)) {
+        console.error("Invalid chat data format:", response.data);
         setChats([]);
+        setChatError("Invalid response format");
         return;
       }
       
       // Handle case where user has no chats yet
       if (chatData.length === 0) {
-        console.log("User has no chats yet");
+        console.log("📱 User has no chats yet");
         setChats([]);
         return;
       }
       
+      // Safely process chat data
       const sortedChats = chatData
-        .map((chat: ChatItem) => ({
-          id: chat.id,
-          name: chat.name,
-          fullName: chat.fullName,
-          lastMessage: chat.lastMessage || "No messages yet",
-          lastMessageTime: chat.lastMessageTime || new Date().toISOString(),
-          unreadCount: chat.unreadCount || 0,
-          avatar: chat.avatar || getEmojiFromName(chat.name),
-        }))
-        .sort((a: any, b: any) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+        .filter((chat: any) => chat && typeof chat === 'object') // Filter out invalid chat objects
+        .map((chat: ChatItem) => {
+          try {
+            return {
+              id: chat.id || chat._id || '',
+              name: chat.name || chat.username || 'Unknown User',
+              fullName: chat.fullName || chat.name || 'Unknown User',
+              lastMessage: chat.lastMessage || "No messages yet",
+              lastMessageTime: chat.lastMessageTime || new Date().toISOString(),
+              unreadCount: chat.unreadCount || 0,
+              avatar: chat.avatar || getEmojiFromName(chat.name || 'Unknown User'),
+            };
+          } catch (error) {
+            console.error("Error processing chat item:", error, chat);
+            return null;
+          }
+        })
+        .filter(Boolean) // Remove null items
+        .sort((a: any, b: any) => {
+          try {
+            return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+          } catch (error) {
+            console.error("Error sorting chats:", error);
+            return 0;
+          }
+        });
       
-      console.log("Processed chats:", sortedChats.length);
+      console.log("📱 Processed chats:", sortedChats.length);
       setChats(sortedChats);
     } catch (error: any) {
-      console.error("Fetch chats error:", error);
-      // Silently handle errors - don't show error messages
+      console.error("📱 Fetch chats error:", error);
+      setChatError(error.response?.data?.message || error.message || "Failed to load chats");
       setChats([]);
     } finally {
       setLoading(false);
@@ -1543,8 +1572,12 @@ const ChatScreen = () => {
       
       // Process messages in batches to avoid blocking the UI
       const batchSize = 50;
-      for (let i = 0; i < messageData.length; i += batchSize) {
-        const batch = messageData.slice(i, i + batchSize);
+      
+      // Limit total messages to prevent memory issues
+      const maxMessages = 1000;
+      const limitedMessageData = messageData.slice(-maxMessages);
+      for (let i = 0; i < limitedMessageData.length; i += batchSize) {
+        const batch = limitedMessageData.slice(i, i + batchSize);
         
         batch.forEach((msg: any) => {
           // Only parse post comment messages when needed (lazy parsing)
@@ -1660,18 +1693,71 @@ const ChatScreen = () => {
 
   // --- Socket.IO Setup ---
   useEffect(() => {
-    const s: Socket = io(SOCKET_URL, { transports: ["websocket"] });
-    setSocket(s);
-    if (user) {
-      s.emit("login", user.id);
-      console.log("🔌 Socket connected and user logged in:", {
-        userId: user.id,
-        username: user.username,
-        fullName: user.fullName
+    try {
+      console.log("🔌 Attempting to connect to socket:", SOCKET_URL);
+      
+      // Add additional safety checks
+      if (!SOCKET_URL || SOCKET_URL === 'undefined') {
+        console.error("🔌 Invalid SOCKET_URL:", SOCKET_URL);
+        setSocketError("Invalid socket URL configuration");
+        return;
+      }
+      
+      const s: Socket = io(SOCKET_URL, { 
+        transports: ["websocket"],
+        timeout: 10000,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        forceNew: true, // Force new connection to avoid stale connections
+        autoConnect: true
       });
+      
+      setSocket(s);
+      
+      // Socket connection events
+      s.on("connect", () => {
+        console.log("🔌 Socket connected successfully");
+        setSocketError(null);
+        if (user) {
+          s.emit("login", user.id);
+          console.log("🔌 User logged in via socket:", {
+            userId: user.id,
+            username: user.username,
+            fullName: user.fullName
+          });
+        }
+      });
+      
+      s.on("connect_error", (error) => {
+        console.error("🔌 Socket connection error:", error);
+        setSocketError("Socket connection failed");
+      });
+      
+      s.on("disconnect", (reason) => {
+        console.log("🔌 Socket disconnected:", reason);
+        if (reason === "io server disconnect") {
+          // Server disconnected, try to reconnect
+          s.connect();
+        }
+      });
+      
+      s.on("online-users", (users) => {
+        try {
+          setOnlineUsers(users);
+        } catch (error) {
+          console.error("Error processing online users:", error);
+        }
+      });
+      
+      return () => { 
+        console.log("🔌 Cleaning up socket connection");
+        s.disconnect(); 
+      };
+    } catch (error) {
+      console.error("🔌 Error setting up socket:", error);
+      setSocketError("Failed to setup socket connection");
     }
-    s.on("online-users", setOnlineUsers);
-    return () => { s.disconnect(); };
   }, [user]);
 
   // Join chat room and listen for events
@@ -1689,15 +1775,19 @@ const ChatScreen = () => {
     setVoiceRecordingUser(null);
     
     socket.on("typing", (data: { chatId: string, typing: {id: string, username: string, fullName: string}[] }) => {
-      const { chatId, typing } = data;
-      if (chatId === activeChat.id) {
-        // Filter out current user from typing display - only show other users typing
-        const otherTypingUsers = typing.filter(typingUser => {
-          const typingUserId = String(typingUser.id);
-          const currentUserId = String(user?.id);
-          return typingUserId !== currentUserId;
-        });
-        setTypingUsers(otherTypingUsers);
+      try {
+        const { chatId, typing } = data;
+        if (chatId === activeChat.id) {
+          // Filter out current user from typing display - only show other users typing
+          const otherTypingUsers = typing.filter(typingUser => {
+            const typingUserId = String(typingUser.id);
+            const currentUserId = String(user?.id);
+            return typingUserId !== currentUserId;
+          });
+          setTypingUsers(otherTypingUsers);
+        }
+      } catch (error) {
+        console.error("Error handling typing event:", error);
       }
     });
     socket.on("voice-recording", (data: { chatId: string, userId: string, username: string, fullName: string, isRecording: boolean }) => {
@@ -1716,16 +1806,20 @@ const ChatScreen = () => {
     });
     
     socket.on("new-message", (msg: Message & { chatId?: string }) => {
-      if (msg.chatId === activeChat.id || msg.sender._id === activeChat.id) {
-        setMessages((prev) => {
-          // Avoid duplicate messages
-          if (prev.some(m => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-        // Scroll to bottom when new message arrives
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+      try {
+        if (msg.chatId === activeChat.id || msg.sender._id === activeChat.id) {
+          setMessages((prev) => {
+            // Avoid duplicate messages
+            if (prev.some(m => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+          // Scroll to bottom when new message arrives
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        }
+      } catch (error) {
+        console.error("Error handling new message event:", error);
       }
     });
     socket.on("message-status", (data: { messageId: string, status: string }) => {
@@ -1959,14 +2053,14 @@ const ChatScreen = () => {
 
 
 
-    const renderTextWithLinks = (text: string, textColor?: string): React.ReactElement => {
+    const renderTextWithLinks = (text: string, textColor?: string): any => {
     try {
       if (!text || typeof text !== 'string') {
         return <Text style={{ color: textColor }}> </Text>;
       }
       
       const parts = text.split(URL_REGEX);
-      const elements: React.ReactElement[] = [];
+      const elements: any[] = [];
       
       parts.forEach((part, index) => {
         if (!part) {
@@ -2233,17 +2327,40 @@ const ChatScreen = () => {
   // --- Messages with drafts ---
   const allMessages = [...messages, ...drafts];
 
+  // Prevent rendering if there are critical errors
+  if (!user || !token) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
+          Authentication Required
+        </Text>
+        <Text style={{ textAlign: 'center', marginBottom: 20, color: '#666' }}>
+          Please log in to access the chat.
+        </Text>
+      </View>
+    );
+  }
+
   // Memoize the grouped messages data to prevent unnecessary re-computations
   const groupedMessagesData = useMemo(() => {
-    const groups = groupMessagesByDate(allMessages, user?.id);
-    const flatData: (Message | { type: 'date'; date: string })[] = [];
-    
-    Object.entries(groups).forEach(([date, dateMessages]) => {
-      flatData.push({ type: 'date', date });
-      flatData.push(...(Array.isArray(dateMessages) ? dateMessages : []));
-    });
-    
-    return flatData;
+    try {
+      const groups = groupMessagesByDate(allMessages, user?.id);
+      const flatData: (Message | { type: 'date'; date: string })[] = [];
+      
+      Object.entries(groups).forEach(([date, dateMessages]) => {
+        if (date && typeof date === 'string') {
+          flatData.push({ type: 'date', date });
+          if (Array.isArray(dateMessages)) {
+            flatData.push(...dateMessages.filter(msg => msg && typeof msg === 'object'));
+          }
+        }
+      });
+      
+      return flatData;
+    } catch (error) {
+      console.error("Error in groupedMessagesData:", error);
+      return [];
+    }
   }, [allMessages, user?.id]);
 
   // Test function to verify audio playback
@@ -2430,8 +2547,7 @@ const handleEdit = async () => {
     </View>
   );
 
-  // In the scroll to bottom button, use WhatsAppDoubleDown and add bounce animation
-  const scrollAnim = useRef(new Animated.Value(0)).current;
+  // Scroll to bottom animation effect
   useEffect(() => {
     if (showScrollToBottom) {
       Animated.sequence([
@@ -2442,7 +2558,7 @@ const handleEdit = async () => {
   }, [showScrollToBottom]);
 
     // Render messages with date grouping
-  const renderMessageWithDate = ({ item, index }: { item: any; index: number }): React.ReactElement => {
+      const renderMessageWithDate = ({ item, index }: { item: any; index: number }): any => {
     try {
       // Defensive: If item is not an object or is a string/array, always return a <Text> error
       if (!item || typeof item !== 'object' || Array.isArray(item)) {
@@ -2456,6 +2572,11 @@ const handleEdit = async () => {
       
       // Handle regular message items
       if (item && !('type' in item)) {
+        // Ensure item has required properties
+        if (!item.id || !item.sender) {
+          return <Text style={{ color: 'red' }}>Invalid message structure</Text>;
+        }
+        
         return (
           <MessageItem
             item={item}
@@ -2468,7 +2589,7 @@ const handleEdit = async () => {
               }
             }}
             renderTextWithLinks={renderTextWithLinks}
-            flatListRef={flatListRef as React.RefObject<FlatList<any>>}
+                                flatListRef={flatListRef}
             onRemoveDraft={item.isDraft ? removeDraft : undefined}
             onLongPress={handleLongPressMessage}
             selectedMessage={selectedMessage}
@@ -2481,6 +2602,7 @@ const handleEdit = async () => {
       // Fallback for unsupported items
       return <Text style={{ color: colors.text }}>Unsupported message type</Text>;
     } catch (error) {
+      console.error("Error in renderMessageWithDate:", error);
       return <Text style={{ color: 'red' }}>Render error: {String(error)}</Text>;
     }
   };
@@ -2646,13 +2768,13 @@ const handleEdit = async () => {
   }
 
     // Defensive wrapper for FlatList renderItem
-  function safeRenderItem(renderFn: (props: any) => React.ReactNode): (props: any) => React.ReactElement {
-    return function(props: any): React.ReactElement {
+  function safeRenderItem(renderFn: (props: any) => any): (props: any) => any {
+    return function(props: any): any {
       try {
         const result = renderFn(props);
         
         // If result is already a valid React element, return it
-        if (React.isValidElement(result)) {
+        if (result && typeof result === 'object' && 'type' in result) {
           return result;
         }
         
@@ -2689,6 +2811,26 @@ const handleEdit = async () => {
           duration={2000}
           colors={colors}
         />
+        
+        {/* Error Display */}
+        {(chatError || socketError) && (
+          <View style={[styles.errorContainer, { backgroundColor: colors.error || '#ff6b6b' }]}>
+            <Text style={[styles.errorText, { color: '#fff' }]}>
+              {chatError || socketError}
+            </Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => {
+                setChatError(null);
+                setSocketError(null);
+                if (token) fetchChats();
+              }}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
         {loading && (
           <View style={[styles.loadingOverlay, { backgroundColor: "rgba(0,0,0,0.1)" }]}>
             <ActivityIndicator size="large" color={colors.chatroom.text} />
@@ -3070,20 +3212,25 @@ const handleEdit = async () => {
                 <KeyboardAvoidingView
                   behavior={Platform.OS === "ios" ? "padding" : "height"}
                   style={{ flex: 1 }}
-                  keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+                  keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
                   enabled={true}
                 >
                   <FlatList
                     ref={flatListRef}
-                    data={groupedMessagesData}
+                    data={groupedMessagesData || []}
                     renderItem={safeRenderItem(({ item }: any) => 
-                      renderMessageWithDate({ item, index: item.id })
+                      renderMessageWithDate({ item, index: item?.id || 0 })
                     )}
                     keyExtractor={(item: any, index: number) => {
-                      if ('type' in item && item.type === 'date') {
-                        return `date-${item.date}-${index}`;
+                      try {
+                        if (item && 'type' in item && item.type === 'date') {
+                          return `date-${item.date}-${index}`;
+                        }
+                        return item && item.id ? `${item.id}-${index}` : `message-${Date.now()}-${index}`;
+                      } catch (error) {
+                        console.error("Error in keyExtractor:", error);
+                        return `fallback-${index}`;
                       }
-                      return item.id ? `${item.id}-${index}` : `message-${Date.now()}-${index}`;
                     }}
                     contentContainerStyle={styles.messageList}
                     showsVerticalScrollIndicator={true}
@@ -3315,7 +3462,7 @@ const handleEdit = async () => {
 
       </GestureHandlerRootView>
     );
-  };
+};
 
 const styles: import("react-native").StyleSheet.NamedStyles<any> = StyleSheet.create({
   container: {
@@ -3827,6 +3974,32 @@ const styles: import("react-native").StyleSheet.NamedStyles<any> = StyleSheet.cr
   audioText: {
     fontSize: 12,
     marginTop: 2,
+  },
+  // Error handling styles
+  errorContainer: {
+    padding: 16,
+    margin: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  retryButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginLeft: 12,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

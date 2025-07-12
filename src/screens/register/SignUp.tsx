@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigation';
 import * as Device from 'expo-device';
+import { useStatusBar } from '../../../App';
 
 type SignUpScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SignUp'>;
 
@@ -39,9 +40,15 @@ const Step2Schema = Yup.object().shape({
 const SignUp: React.FC = () => {
   const navigation = useNavigation<SignUpScreenNavigationProp>();
   const { signup } = useAuth();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
+  const { setStatusBarStyle } = useStatusBar();
   const [step, setStep] = useState(1); // Step 1: Basic info, Step 2: Security questions
   const [error, setError] = useState('');
+
+  // Update StatusBar style based on theme
+  useEffect(() => {
+    setStatusBarStyle(theme === 'dark' ? 'light' : 'dark');
+  }, [theme, setStatusBarStyle]);
   const [formValues, setFormValues] = useState({
     fullName: '',
     username: '',
@@ -134,7 +141,11 @@ const SignUp: React.FC = () => {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text }]}>Full Name</Text>
                     <TextInput
-                      style={[styles.input, touched.fullName && errors.fullName && styles.inputError]}
+                      style={[
+                        styles.input, 
+                        { color: colors.text, backgroundColor: colors.card },
+                        touched.fullName && errors.fullName && styles.inputError
+                      ]}
                       placeholder="Enter full name"
                       placeholderTextColor={colors.placeholder}
                       value={values.fullName}
@@ -150,7 +161,11 @@ const SignUp: React.FC = () => {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text }]}>Username</Text>
                     <TextInput
-                      style={[styles.input, touched.username && errors.username && styles.inputError]}
+                      style={[
+                        styles.input, 
+                        { color: colors.text, backgroundColor: colors.card },
+                        touched.username && errors.username && styles.inputError
+                      ]}
                       placeholder="Enter username"
                       placeholderTextColor={colors.placeholder}
                       value={values.username}
@@ -166,7 +181,11 @@ const SignUp: React.FC = () => {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
                     <TextInput
-                      style={[styles.input, touched.email && errors.email && styles.inputError]}
+                      style={[
+                        styles.input, 
+                        { color: colors.text, backgroundColor: colors.card },
+                        touched.email && errors.email && styles.inputError
+                      ]}
                       placeholder="Enter email address"
                       placeholderTextColor={colors.placeholder}
                       value={values.email}
@@ -183,7 +202,11 @@ const SignUp: React.FC = () => {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text }]}>Password</Text>
                     <TextInput
-                      style={[styles.input, touched.password && errors.password && styles.inputError]}
+                      style={[
+                        styles.input, 
+                        { color: colors.text, backgroundColor: colors.card },
+                        touched.password && errors.password && styles.inputError
+                      ]}
                       placeholder="Enter password"
                       placeholderTextColor={colors.placeholder}
                       value={values.password}
@@ -265,9 +288,13 @@ const SignUp: React.FC = () => {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text }]}>What is your favorite meme?</Text>
                     <TextInput
-                      style={[styles.input, touched.securityAnswer1 && errors.securityAnswer1 && styles.inputError]}
+                      style={[
+                        styles.input, 
+                        { color: colors.text, backgroundColor: colors.card },
+                        touched.securityAnswer1 && errors.securityAnswer1 && styles.inputError
+                      ]}
                       placeholder="Enter answer"
-                      placeholderTextColor={colors.text}
+                      placeholderTextColor={colors.placeholder}
                       value={values.securityAnswer1}
                       onChangeText={handleChange('securityAnswer1')}
                       onBlur={handleBlur('securityAnswer1')}
@@ -280,9 +307,13 @@ const SignUp: React.FC = () => {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text }]}>What is your favorite meme character?</Text>
                     <TextInput
-                      style={[styles.input, touched.securityAnswer2 && errors.securityAnswer2 && styles.inputError]}
+                      style={[
+                        styles.input, 
+                        { color: colors.text, backgroundColor: colors.card },
+                        touched.securityAnswer2 && errors.securityAnswer2 && styles.inputError
+                      ]}
                       placeholder="Enter answer"
-                      placeholderTextColor={colors.text}
+                      placeholderTextColor={colors.placeholder}
                       value={values.securityAnswer2}
                       onChangeText={handleChange('securityAnswer2')}
                       onBlur={handleBlur('securityAnswer2')}
@@ -295,9 +326,13 @@ const SignUp: React.FC = () => {
                   <View style={styles.inputContainer}>
                     <Text style={[styles.label, { color: colors.text }]}>What is your favorite meme website?</Text>
                     <TextInput
-                      style={[styles.input, touched.securityAnswer3 && errors.securityAnswer3 && styles.inputError]}
+                      style={[
+                        styles.input, 
+                        { color: colors.text, backgroundColor: colors.card },
+                        touched.securityAnswer3 && errors.securityAnswer3 && styles.inputError
+                      ]}
                       placeholder="Enter answer"
-                      placeholderTextColor={colors.text}
+                      placeholderTextColor={colors.placeholder}
                       value={values.securityAnswer3}
                       onChangeText={handleChange('securityAnswer3')}
                       onBlur={handleBlur('securityAnswer3')}
@@ -402,7 +437,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,

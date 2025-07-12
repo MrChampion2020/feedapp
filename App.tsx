@@ -2,6 +2,8 @@ import { StatusBar } from "expo-status-bar"
 import { View } from "react-native"
 import React, { useState, useEffect, useRef, createContext, useContext } from "react"
 import { View as RNView, Text, AppState, type AppStateStatus, Platform } from "react-native"
+
+// Navigation bar theming is handled in ThemeContext.tsx
 import { AuthProvider } from "./src/contexts/AuthContext"
 import { ThemeProvider } from "./src/contexts/ThemeContext"
 import AppNavigator from "./src/navigation/index"
@@ -64,6 +66,21 @@ export default function App() {
   const appState = useRef(AppState.currentState)
   const [statusBarStyle, setStatusBarStyle] = useState<"light" | "dark">("dark")
 
+  // Load theme on app start to set initial StatusBar style
+  useEffect(() => {
+    const loadInitialTheme = async () => {
+      try {
+        const savedTheme = await AsyncStorage.getItem("theme");
+        const isDark = savedTheme === "dark";
+        setStatusBarStyle(isDark ? "light" : "dark");
+        console.log("🎨 App.tsx: Initial StatusBar style set to", isDark ? "light" : "dark");
+      } catch (error) {
+        console.error("❌ Failed to load initial theme:", error);
+      }
+    };
+    loadInitialTheme();
+  }, []);
+
   useEffect(() => {
     const subscription = AppState.addEventListener("change", handleAppStateChange)
 
@@ -94,6 +111,8 @@ export default function App() {
   const handleUnlock = () => {
     setShowAppLock(false)
   }
+
+  // Navigation bar theming is handled in ThemeContext.tsx
 
   // Use View instead of SafeAreaView to prevent layout recalculation issues
   return (
