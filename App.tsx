@@ -14,6 +14,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 
+// Debug utilities for React Native text warnings
+import { enableTextWarningDebug } from "./src/utils/debugUtils"
+
 // StatusBar Context
 const StatusBarContext = createContext<{
   setStatusBarStyle: (style: "light" | "dark") => void;
@@ -61,6 +64,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 export default function App() {
+  // Enable text warning debugging in development
+  if (__DEV__) {
+    enableTextWarningDebug();
+  }
+
   const [showBlankScreen, setShowBlankScreen] = useState(false)
   const [showAppLock, setShowAppLock] = useState(false)
   const appState = useRef(AppState.currentState)

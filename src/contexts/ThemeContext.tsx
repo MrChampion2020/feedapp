@@ -6,6 +6,10 @@ import { StatusBar } from "expo-status-bar";
 // Use require instead of import for images
 const chatlight = require("../assets/images/chatlight.png");
 const chatdark = require("../assets/images/chatdark.jpg");
+
+console.log("🎨 ThemeContext: Loading background images");
+console.log("🎨 chatlight:", chatlight);
+console.log("🎨 chatdark:", chatdark);
 // For Expo managed workflow, we'll use StatusBar for navigation bar theming
 // The navigation bar color will be controlled through the StatusBar component
 
@@ -307,6 +311,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const colors = theme === "light" ? lightColors : darkColors;
+  
+  console.log("🎨 ThemeContext: Current theme:", theme);
+  console.log("🎨 ThemeContext: Background image:", colors.chatroom.backgroundImage);
+  console.log("🎨 ThemeContext: Background image type:", typeof colors.chatroom.backgroundImage);
+  console.log("🎨 ThemeContext: Background image value:", JSON.stringify(colors.chatroom.backgroundImage));
 
   const contextValue: ThemeContextType = {
     theme,

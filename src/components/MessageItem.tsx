@@ -167,7 +167,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           )}
 
           {parsedMessage.isPostComment ? (
-            <PostCommentPreview postData={parsedMessage.postData} comment={parsedMessage.comment} colors={colors} />
+            <PostCommentPreview postData={parsedMessage.postData} comment={parsedMessage.comment || ''} colors={colors} />
           ) : item.messageType === "image" && item.image ? (
             <TouchableOpacity onPress={() => console.log("Image pressed - could open full screen view")}>
               <Image source={{ uri: item.image }} style={styles.messageImage} />
