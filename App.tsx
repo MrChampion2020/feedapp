@@ -5,7 +5,7 @@ import { View as RNView, Text, AppState, type AppStateStatus, Platform } from "r
 
 // Navigation bar theming is handled in ThemeContext.tsx
 import { AuthProvider } from "./src/contexts/AuthContext"
-import { ThemeProvider } from "./src/contexts/ThemeContext"
+import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext"
 import AppNavigator from "./src/navigation/index"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { BlankScreenOverlay } from "./src/components/BlankScreen"
@@ -63,6 +63,20 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
+function ThemedAppContent({ showBlankScreen, showAppLock, handleUnlock }: { showBlankScreen: boolean, showAppLock: boolean, handleUnlock: () => void }) {
+  const { colors, theme } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={theme === "dark" ? "light" : "dark"} backgroundColor={colors.background} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <AppNavigator />
+      </SafeAreaView>
+      <BlankScreenOverlay visible={showBlankScreen} />
+      <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
+    </View>
+  );
+}
+
 export default function App() {
   // Enable text warning debugging in development
   if (__DEV__) {
@@ -72,7 +86,11 @@ export default function App() {
   const [showBlankScreen, setShowBlankScreen] = useState(false)
   const [showAppLock, setShowAppLock] = useState(false)
   const appState = useRef(AppState.currentState)
-  const [statusBarStyle, setStatusBarStyle] = useState<"light" | "dark">("dark")
+  // Remove local statusBarStyle state
+  // const [statusBarStyle, setStatusBarStyle] = useState<"light" | "dark">("dark")
+
+  // Use theme from ThemeContext
+  // const { colors, theme } = useTheme();
 
   // Load theme on app start to set initial StatusBar style
   useEffect(() => {
@@ -80,7 +98,7 @@ export default function App() {
       try {
         const savedTheme = await AsyncStorage.getItem("theme");
         const isDark = savedTheme === "dark";
-        setStatusBarStyle(isDark ? "light" : "dark");
+        // setStatusBarStyle(isDark ? "light" : "dark"); // This line is removed
         console.log("🎨 App.tsx: Initial StatusBar style set to", isDark ? "light" : "dark");
       } catch (error) {
         console.error("❌ Failed to load initial theme:", error);
@@ -125,26 +143,15 @@ export default function App() {
   // Use View instead of SafeAreaView to prevent layout recalculation issues
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        <StatusBar style={statusBarStyle} />
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <ErrorBoundary>
-            <StatusBarContext.Provider value={{ setStatusBarStyle }}>
-              <ThemeProvider>
-                <AuthProvider>
-                  <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-                    <AppNavigator />
-                  </SafeAreaView>
-                  {/* Blank screen overlay when app is in background */}
-                  <BlankScreenOverlay visible={showBlankScreen} />
-                  {/* App lock screen */}
-                  <AppLockScreen visible={showAppLock} onUnlock={handleUnlock} />
-                </AuthProvider>
-              </ThemeProvider>
-            </StatusBarContext.Provider>
-          </ErrorBoundary>
-        </GestureHandlerRootView>
-      </View>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              <ThemedAppContent showBlankScreen={showBlankScreen} showAppLock={showAppLock} handleUnlock={handleUnlock} />
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   )
 }

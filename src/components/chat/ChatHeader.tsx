@@ -33,7 +33,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   return (
     <View style={[styles.header, {
-      backgroundColor: colors.theme === 'dark' ? '#11181C' : 'rgb(0, 0, 0)',
+      backgroundColor: colors.theme === 'dark' ? colors.background : colors.background,
       borderBottomColor: 'transparent',
       paddingTop: Platform.OS === 'ios' ? 44 : 0
     }]}> 
@@ -45,7 +45,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       >
         <ArrowLeft color={colors.theme === 'dark' ? '#fff' : 'grey'} />
       </TouchableOpacity>
-      <View style={[styles.avatarContainer, {backgroundColor: colors.transparent}]}>
+      <View style={[styles.avatarContainer, {backgroundColor: colors.background}]}>
         <View style={[styles.avatar, { backgroundColor: activeChat.avatar?.startsWith('http') ? colors.transparent : colors.icon }]}> 
           {activeChat.avatar?.startsWith('http') ? (
             <Image source={{ uri: activeChat.avatar }} style={styles.avatarImage} />
@@ -72,14 +72,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           style={[
             styles.followButton,
             {
-              backgroundColor: isFollowing ? (colors.theme === 'dark' ? 'rgba(32,44,51,0.7)' : '#e0e0e0') : colors.primary,
+              backgroundColor: isFollowing ? (colors.theme === 'dark' ? 'rgba(32,44,51,0.7)' : colors.transparent) : colors.background,
               borderColor: colors.primary,
             },
           ]}
           activeOpacity={0.8}
           hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
         >
-          {isFollowing ? <UserCheck size={16} color={colors.theme === 'dark' ? '#fff' : '#222'} /> : <UserPlus size={16} color={colors.theme === 'dark' ? '#fff' : '#fff'} />}
+          {isFollowing ? <UserCheck size={16} color={colors.theme === 'dark' ? colors.text : colors.text} /> : <UserPlus size={16} color={colors.theme === 'dark' ? colors.text : colors.text} />}
         </TouchableOpacity>
       </View>
     </View>

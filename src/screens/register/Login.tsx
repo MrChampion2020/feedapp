@@ -41,15 +41,20 @@ const Login: React.FC = () => {
 
     try {
       const deviceId = Device.deviceName || "unknown-device"
-
-      // First, validate credentials
       await login(values.identifier, values.password, deviceId)
 
-      // Then generate OTP
+      // Determine if identifier is email or username
+      let otpPayload: any = {}
+      if (values.identifier.includes("@")) {
+        otpPayload.email = values.identifier
+      } else {
+        otpPayload.username = values.identifier
+      }
+
       const otpResponse = await fetch("https://feeda.onrender.com/api/auth/generate-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: values.identifier }),
+        body: JSON.stringify(otpPayload),
       })
 
       if (!otpResponse.ok) {
@@ -58,9 +63,7 @@ const Login: React.FC = () => {
       }
 
       const otpData = await otpResponse.json()
-
-      // Navigate to verification screen with the actual email
-      navigation.navigate("Verify", { email: otpData.email || values.identifier })
+      navigation.navigate("Verify", { email: values.identifier })
     } catch (err: any) {
       setError(err.message || "Login failed")
     } finally {

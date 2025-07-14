@@ -623,7 +623,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       style={[
         styles.inputContainer,
         {
-          backgroundColor: colors.theme === 'dark' ? 'transparent' : 'rgba(0, 0, 0, 0.86)',
+          backgroundColor: colors.theme === 'dark' ? 'transparent' : colors.background,
           borderTopColor: 'transparent',
           borderRadius: 24,
           margin: 8,

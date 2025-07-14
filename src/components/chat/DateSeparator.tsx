@@ -15,7 +15,7 @@ export const DateSeparator: React.FC<DateSeparatorProps> = ({ date, colors }) =>
       <View style={[
         styles.separator,
         {
-          backgroundColor: isDark ? '#232D36' : 'rgba(36, 36, 36, 0.96)',
+          backgroundColor: isDark ? '#232D36' : colors.background,
           borderRadius: 16,
           paddingHorizontal: 16,
           paddingVertical: 4,

@@ -261,7 +261,7 @@ export function Navigation() {
               <View style={[styles.container, { backgroundColor: colors.background }]}>
                 <TabNavigator />
                 {!hideTabBar && (
-                  <View style={styles.tabBarWrapper}>
+                  <View style={[styles.tabBarWrapper, { backgroundColor: colors.tabbg }]}>
                     <TabBar activeTab={currentTab} onTabPress={handleTabPress} />
                   </View>
                 )}
