@@ -3,9 +3,11 @@ import { createContext, useContext, useState, useEffect } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import axios from "axios"
 import NetInfo from "@react-native-community/netinfo"
+import io from 'socket.io-client';
 
 const API_URL = "https://feeda-5rz1.onrender.com/api"
 const SOCKET_URL = API_URL.replace(/\/api$/, '');
+const socket = io(SOCKET_URL, { autoConnect: false });
 
 // Create axios instance with better configuration
 const api = axios.create({
@@ -79,7 +81,7 @@ export const useAuth = () => {
   return context
 }
 
-export { api, API_URL, SOCKET_URL }
+export { api, API_URL, SOCKET_URL, socket }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)

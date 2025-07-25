@@ -7,11 +7,7 @@ import { StatusBar } from "expo-status-bar";
 const chatlight = require("../assets/images/chatlight.png");
 const chatdark = require("../assets/images/chatdark.jpg");
 
-console.log("🎨 ThemeContext: Loading background images");
-console.log("🎨 chatlight:", chatlight);
-console.log("🎨 chatdark:", chatdark);
-// For Expo managed workflow, we'll use StatusBar for navigation bar theming
-// The navigation bar color will be controlled through the StatusBar component
+// Remove all console.log and console.warn statements throughout this file.
 
 type ThemeType = "light" | "dark";
 
@@ -273,17 +269,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (Platform.OS === "android") {
           if (theme === "dark") {
             // Dark theme: dark background, light icons
-            console.log("🎨 Android StatusBar set to dark theme");
           } else {
             // Light theme: light background, dark icons
-            console.log("🎨 Android StatusBar set to light theme");
           }
         } else if (Platform.OS === "ios") {
           // iOS uses StatusBar for navigation bar theming
-          console.log("🎨 iOS StatusBar set to", theme === "dark" ? "light-content" : "dark-content");
         }
       } catch (error) {
-        console.error("❌ Failed to set StatusBar color:", error);
       }
     };
     
@@ -312,11 +304,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const colors = theme === "light" ? lightColors : darkColors;
   
-  console.log("🎨 ThemeContext: Current theme:", theme);
-  console.log("🎨 ThemeContext: Background image:", colors.chatroom.backgroundImage);
-  console.log("🎨 ThemeContext: Background image type:", typeof colors.chatroom.backgroundImage);
-  console.log("🎨 ThemeContext: Background image value:", JSON.stringify(colors.chatroom.backgroundImage));
-
   const contextValue: ThemeContextType = {
     theme,
     colors,

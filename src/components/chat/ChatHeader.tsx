@@ -60,7 +60,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           {(() => {
             const { isVerified, isPremiumVerified } = getUserVerificationStatus(activeChat.id);
             return (
-              <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
+              <VerifiedBadge size={20} />
             );
           })()}
         </View>

@@ -350,11 +350,13 @@ const SettingsScreen = () => {
       >
         {/* Profile Header with Faint Background Image */}
         <View style={styles.profileHeader}>
+          
           <Image
             source={
               profile?.profilePicture ? { uri: profile.profilePicture } : require("../../assets/images/feeda.png")
             }
             style={styles.backgroundImage}
+            resizeMode="cover"
           />
           <View style={styles.overlay} />
           <View style={styles.profileContent}>
@@ -376,10 +378,6 @@ const SettingsScreen = () => {
             <View style={styles.profileRightSection}>
               <View style={styles.profileNameRow}>
                 <Text style={[styles.profileName, { color: "#FFFFFF" }]}>{profile?.fullName || "User"}</Text>
-                {(() => {
-                  const { isVerified, isPremiumVerified } = getUserVerificationStatus(profile?.id || "")
-                                          return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
-                })()}
               </View>
               <Text style={[styles.usernameText, { color: "#FFFFFF" }]}>@{profile?.username}</Text>
               <View style={[styles.contactCard, { backgroundColor: themeColors.card }]}>
@@ -619,12 +617,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   profileHeader: {
-    paddingTop: Platform.OS === "ios" ? 0 : 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
     flexDirection: "row",
     position: "relative",
     height: 220,
+    width: '100%',
+    overflow: 'hidden',
   },
   backgroundImage: {
     position: "absolute",
@@ -634,7 +631,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     height: "100%",
-    opacity: 0.2,
+    opacity: 1,
   },
   overlay: {
     position: "absolute",
@@ -647,6 +644,10 @@ const styles = StyleSheet.create({
   profileContent: {
     flexDirection: "row",
     zIndex: 1,
+    paddingTop: Platform.OS === "ios" ? 0 : 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    width: '100%',
   },
   profileLeftSection: {
     alignItems: "center",

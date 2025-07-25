@@ -10,6 +10,7 @@ import { useTheme } from "../../contexts/ThemeContext"
 import { useAuth } from "../../contexts/AuthContext"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import type { RootStackParamList } from "../../types/navigation"
+import { StatusBar } from 'expo-status-bar';
 
 type VerifyScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Verify">
 
@@ -19,8 +20,9 @@ const VerifySchema = Yup.object().shape({
 
 const Verify: React.FC = () => {
   const navigation = useNavigation<VerifyScreenNavigationProp>()
-  const { verifyOtp } = useAuth()
+  const { verifyOtp, api, API_URL } = useAuth()
   const { colors } = useTheme()
+  const { theme } = useTheme();
   const route = useRoute()
   const { email } = route.params as { email: string }
   const [error, setError] = useState("")
@@ -47,15 +49,17 @@ const Verify: React.FC = () => {
       setIsResending(true)
       setError("")
 
-      const response = await fetch("https://feeda.onrender.com/api/auth/generate-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to resend OTP")
+      const payload = { email };
+      const response = await api.post('/auth/generate-otp', payload);
+      if (response.status !== 200) {
+        let errorMessage = "Failed to send OTP";
+        try {
+          const errorData = response.data;
+          errorMessage = errorData.message || errorMessage;
+        } catch (jsonErr) {
+          errorMessage = jsonErr.message || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       // Show success message
@@ -69,6 +73,7 @@ const Verify: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       <View style={styles.content}>
         <Text style={[styles.title, { color: colors.text }]}>Verify Your Account</Text>
         <Text style={[styles.subtitle, { color: colors.text }]}>Enter the OTP sent to {email}</Text>

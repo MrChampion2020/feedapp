@@ -29,6 +29,7 @@ const Login: React.FC = () => {
   const { login } = useAuth()
   const { colors, theme } = useTheme()
   const { setStatusBarStyle } = useStatusBar()
+  const { api, API_URL } = useAuth();
 
   // Update StatusBar style based on theme
   useEffect(() => {
@@ -51,18 +52,19 @@ const Login: React.FC = () => {
         otpPayload.username = values.identifier
       }
 
-      const otpResponse = await fetch("https://feeda.onrender.com/api/auth/generate-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(otpPayload),
-      })
-
-      if (!otpResponse.ok) {
-        const errorData = await otpResponse.json()
-        throw new Error(errorData.message || "Failed to send OTP")
+      const otpResponse = await api.post('/auth/generate-otp', otpPayload);
+      if (otpResponse.status !== 200) {
+        let errorMessage = "Failed to send OTP";
+        try {
+          const errorData = otpResponse.data;
+          errorMessage = errorData.message || errorMessage;
+        } catch (jsonErr) {
+          errorMessage = jsonErr.message || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      const otpData = await otpResponse.json()
+      const otpData = otpResponse.data
       navigation.navigate("Verify", { email: values.identifier })
     } catch (err: any) {
       setError(err.message || "Login failed")

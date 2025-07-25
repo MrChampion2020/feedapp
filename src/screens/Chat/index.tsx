@@ -162,10 +162,7 @@ const ChatScreen = () => {
       <View style={styles.chatInfo}>
         <View style={styles.chatNameRow}>
           <Text style={[styles.chatName, { color: colors.text }]}>{item.fullName || item.name}</Text>
-          {(() => {
-            const { isVerified, isPremiumVerified } = getUserVerificationStatus(item.id)
-            return <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} />
-          })()}
+          <VerifiedBadge size={20} />
         </View>
         <Text style={[styles.chatUsername, { color: colors.grey }]}>@{item.name}</Text>
         <Text style={[styles.chatLastMessage, { color: colors.grey }]} numberOfLines={1}>

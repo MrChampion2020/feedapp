@@ -30,6 +30,7 @@ import ChatInfoModal from './ChatInfoModal';
 import ChatErrorBoundary from './ChatErrorBoundary';
 import { Message, ChatItem } from '../../types/ChatItem';
 import ChatActionsBar from './ChatActionsBar';
+import { socket } from '../../contexts/AuthContext';
 
 interface ChatRoomProps {
   activeChat: ChatItem | null;
@@ -81,11 +82,42 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ activeChat, onBack, onChatChange })
 
   // Effects
   useEffect(() => {
-    if (activeChat && token) {
-      fetchMessages(activeChat.id);
-      checkFollowStatus(activeChat.id);
+    if (activeChat && user) {
+      // Connect and join chat room
+      if (!socket.connected) socket.connect();
+      socket.emit('join-chat', activeChat.id);
+
+      // Listen for new messages
+      const handleNewMessage = (msg: any) => {
+        if (msg.chatId === activeChat.id) {
+          setMessages(prev => {
+            // Remove any message with the same id, then add the new one
+            const filtered = prev.filter(m => m.id !== msg.id);
+            return [...filtered, {
+              id: msg.id,
+              text: msg.text,
+              image: msg.image,
+              audio: msg.audio,
+              video: msg.video,
+              messageType: msg.messageType || 'text',
+              sender: msg.sender,
+              timestamp: msg.timestamp,
+              isRead: msg.isRead || false,
+              createdAt: msg.createdAt,
+            }];
+          });
+        }
+      };
+      socket.on('new-message', handleNewMessage);
+
+      return () => {
+        socket.off('new-message', handleNewMessage);
+        socket.emit('join-chat', null); // Optionally leave room
+        // Optionally disconnect socket if not needed elsewhere
+        // socket.disconnect();
+      };
     }
-  }, [activeChat, token]);
+  }, [activeChat, user]);
 
   // Error handling wrapper
   const handleError = (error: any, context: string) => {
@@ -315,29 +347,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ activeChat, onBack, onChatChange })
         );
         
         if (result?.data?.chat) {
-          const newMessage: Message = {
-            id: result.data.chat._id,
-            text: text.trim() || undefined,
-            messageType: primaryMessageType,
-            // Include media URIs for immediate preview
-            image: mediaFiles.find(m => m.messageType.includes('image'))?.uri,
-            video: mediaFiles.find(m => m.messageType.includes('video'))?.uri,
-            audio: mediaFiles.find(m => m.messageType.includes('audio'))?.uri,
-            // Handle multiple media files
-            images: mediaFiles.filter(m => m.messageType.includes('image')).map(m => m.uri),
-            videos: mediaFiles.filter(m => m.messageType.includes('video')).map(m => m.uri),
-            audios: mediaFiles.filter(m => m.messageType.includes('audio')).map(m => m.uri),
-            sender: {
-              _id: user.id,
-              username: user.username,
-              fullName: user.fullName,
-              profilePicture: user.profilePicture,
-            },
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            replyTo: replyingTo || undefined,
-          };
-          
-          setMessages(prev => [...prev, newMessage]);
+          // Do NOT update setMessages here. Wait for socket event.
           setSuccessMessage("Message sent");
           setShowSuccessNotification(true);
         }
@@ -356,23 +366,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ activeChat, onBack, onChatChange })
           }),
           'sending text message'
         );
-        
         if (result?.data?.chat) {
-          const newMessage: Message = {
-            id: result.data.chat._id,
-            text: text.trim(),
-            messageType: "text",
-            sender: {
-              _id: user.id,
-              username: user.username,
-              fullName: user.fullName,
-              profilePicture: user.profilePicture,
-            },
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            replyTo: replyingTo || undefined,
-          };
-          
-          setMessages(prev => [...prev, newMessage]);
+          // Do NOT update setMessages here. Wait for socket event.
         }
       }
       
@@ -659,8 +654,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ activeChat, onBack, onChatChange })
     <ChatErrorBoundary>
       <ImageBackground
         source={colors.chatroom.backgroundImage}
-        style={[styles.container, { backgroundColor: colors.chatroom.background }]}
+        style={[styles.container, { backgroundColor: colors.chatroom.background, justifyContent: 'flex-end' }]}
         resizeMode="cover"
+        imageStyle={{ resizeMode: 'cover', opacity: 0.7, alignSelf: 'center' }}
         onLoad={() => console.log("🎨 Background image loaded successfully")}
         onError={(error) => console.log("🎨 Background image failed to load:", error)}
       >
@@ -690,7 +686,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ activeChat, onBack, onChatChange })
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.keyboardView}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 20}
           >
             <ChatMessageList
               messages={messages}

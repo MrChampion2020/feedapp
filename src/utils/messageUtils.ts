@@ -39,8 +39,6 @@ export const parsePostCommentMessage = (text: string) => {
         timestamp = parts[1] ? parts[1].replace(")", "") : "2 days ago";
       }
 
-      console.log("🔍 Parsed comment message:", { imageUrl, caption, comment, timestamp });
-
       return {
         isPostComment: true,
         postData: {

@@ -233,11 +233,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
 
   const checkServerConnection = async () => {
     try {
-      const response = await fetch("https://feeda.onrender.com/api/health", { method: "GET" })
-      return response.ok
+      await api.get('/health');
+      return true;
     } catch (error) {
       console.log("Server connection failed:", error)
-      return false
+      return false;
     }
   }
 
@@ -858,7 +858,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
             <View style={styles.userInfo}>
               <View style={styles.userNameRow}>
                 <Text style={[styles.fullName, { color: colors.text, fontSize: 14, fontWeight: "500" }]}>{item.user.fullName}</Text>
-                                        <VerifiedBadge isVerified={isVerified} isPremiumVerified={isPremiumVerified} size={10} style={{ marginLeft: 2 }} />
+                <VerifiedBadge size={20} style={{ marginLeft: 2 }} />
                 <Text style={[styles.username, { color: colors.text, marginLeft: 4, fontSize: 13 }]}>@{item.user.username}</Text>
                 <Text style={[styles.timestamp, { color: colors.text }]}>·</Text>
                 <Text style={[styles.timestamp, { color: colors.text }]}>{formatTimeAgo(item.createdAt)}</Text>
@@ -957,20 +957,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
             )}
             {/* Show more/less link */}
             {!isExpanded && nonHashtagText.length > 120 && (
-              <Text
+              <TouchableOpacity
                 style={{ color: colors.primary, fontSize: 13, fontWeight: "500", marginTop: 2 }}
                 onPress={() => setExpandedPosts((prev) => ({ ...prev, [item._id]: true }))}
               >
-                Show more
-              </Text>
+                <Text>Show more</Text>
+              </TouchableOpacity>
             )}
             {isExpanded && nonHashtagText.length > 120 && (
-              <Text
+              <TouchableOpacity
                 style={{ color: colors.primary, fontSize: 13, fontWeight: "500", marginTop: 2 }}
                 onPress={() => setExpandedPosts((prev) => ({ ...prev, [item._id]: false }))}
               >
-                Show less
-              </Text>
+                <Text>Show less</Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
