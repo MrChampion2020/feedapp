@@ -259,8 +259,8 @@ const UserProfileScreen: React.FC = () => {
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{profile.username}</Text>
           {isOwnProfile && (
-            <TouchableOpacity onPress={() => setIsEditing(!isEditing)}>
-              <Ionicons name={isEditing ? "close" : "create-outline"} size={24} color={colors.text} />
+            <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}>
+              <Ionicons name="create-outline" size={24} color={colors.text} />
             </TouchableOpacity>
           )}
         </View>

@@ -174,7 +174,11 @@ const SettingsScreen = () => {
       const response = await api.get(`/users/${currentUser?.id}`)
       if (response.status === 200) {
         setProfile(response.data.user)
-        setEditedProfile(response.data.user)
+        setEditedProfile({
+          username: response.data.user.username || '',
+          fullName: response.data.user.fullName || '',
+          bio: response.data.user.bio || ''
+        })
       }
     } catch (error) {
       // console.error("Error fetching profile:", error)
@@ -188,6 +192,7 @@ const SettingsScreen = () => {
     try {
       const response = await api.put("/users/update", {
         userId: currentUser?.id,
+        username: editedProfile.username,
         fullName: editedProfile.fullName,
         bio: editedProfile.bio,
       })
@@ -369,7 +374,7 @@ const SettingsScreen = () => {
               />
               <TouchableOpacity
                 style={[styles.editProfileButton, { backgroundColor: themeColors.background }]}
-                onPress={openEditModal}
+                onPress={() => navigation.navigate('EditProfile')}
               >
                 <Text style={[styles.editProfileText, { color: themeColors.text }]}>Edit Profile</Text>
               </TouchableOpacity>
@@ -378,12 +383,14 @@ const SettingsScreen = () => {
             <View style={styles.profileRightSection}>
               <View style={styles.profileNameRow}>
                 <Text style={[styles.profileName, { color: "#FFFFFF" }]}>{profile?.fullName || "User"}</Text>
+                
+                <VerifiedBadge size={24} />
               </View>
               <Text style={[styles.usernameText, { color: "#FFFFFF" }]}>@{profile?.username}</Text>
-              <View style={[styles.contactCard, { backgroundColor: themeColors.card }]}>
+              <View style={[styles.contactCard, { backgroundColor: themeColors.transparent }]}>
                 <View style={styles.contactInfo}>
-                  <Text style={[styles.contactLabel, { color: "#FFFFFF" }]}>Email</Text>
-                  <Text style={[styles.contactValue, { color: "#FFFFFF" }]}>{profile?.email || "Not provided"}</Text>
+                  <Text style={[styles.contactLabel, { color: themeColors.grey }]}>Email</Text>
+                  <Text style={[styles.contactValue, { color: themeColors.grey }]}>{profile?.email || "Not provided"}</Text>
                 </View>
               </View>
             </View>
@@ -504,6 +511,17 @@ const SettingsScreen = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.editModalContent}>
+              <Text style={{ color: themeColors.text, fontWeight: 'bold', marginBottom: 4 }}>Username</Text>
+              <TextInput
+                style={[styles.editInput, { color: themeColors.text, borderColor: themeColors.border }]}
+                value={editedProfile.username || ""}
+                onChangeText={(text) => setEditedProfile((prev) => ({ ...prev, username: text }))}
+                placeholder="Username"
+                placeholderTextColor={themeColors.placeholder}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Text style={{ color: themeColors.text, fontWeight: 'bold', marginTop: 12, marginBottom: 4 }}>Full Name</Text>
               <TextInput
                 style={[styles.editInput, { color: themeColors.text, borderColor: themeColors.border }]}
                 value={editedProfile.fullName || ""}
@@ -511,6 +529,7 @@ const SettingsScreen = () => {
                 placeholder="Full Name"
                 placeholderTextColor={themeColors.placeholder}
               />
+              <Text style={{ color: themeColors.text, fontWeight: 'bold', marginTop: 12, marginBottom: 4 }}>Bio</Text>
               <TextInput
                 style={[
                   styles.editInput,
@@ -639,7 +658,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(70, 71, 71, 0.83)",
   },
   profileContent: {
     flexDirection: "row",

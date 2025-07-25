@@ -419,11 +419,38 @@ const UploadFeed = () => {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-              <Text style={styles.close}>{'←'}</Text>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              disabled={isUploading}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={[styles.close, { opacity: isUploading ? 0.5 : 1, color: colors.text }]}>×</Text>
             </TouchableOpacity>
-            <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Upload Feed</Text>
-            <View style={{ width: 32 }} />
+            <Animated.View style={{ transform: [{ scale: postButtonScale }] }}>
+              <Pressable
+                onPress={handleUpload}
+                disabled={isUploading || (!caption.trim() && media.length === 0)}
+                onPressIn={() => animatePressIn(postButtonScale)}
+                onPressOut={() => animatePressOut(postButtonScale)}
+                style={[
+                  styles.postButtonContainer,
+                  { backgroundColor: isUploading || (!caption.trim() && media.length === 0) ? colors.secondary : colors.primary },
+                ]}
+              >
+                <Text style={[styles.postButton, { 
+                  color: isUploading || (!caption.trim() && media.length === 0) 
+                    ? colors.text 
+                    : theme === 'light'
+                      ? '#FFFFFF' 
+                      : theme === 'dark' && (caption.trim() || media.length > 0)
+                        ? '#FFFFFF' 
+                        : '#000000'
+                }]}>
+                  {isUploading ? "Posting..." : "Post"}
+                </Text>
+              </Pressable>
+            </Animated.View>
           </View>
 
           {/* Upload Progress */}

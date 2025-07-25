@@ -1107,6 +1107,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
     </View>
   )
 
+  // Skeleton loader for posts
+  if (loading && posts.length === 0) {
+    return (
+      <View style={{ flex: 1 }}>
+        {/* Render the normal page structure, but overlay the skeletons */}
+        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 10, justifyContent: 'center', alignItems: 'center' }} pointerEvents="auto">
+          {[...Array(5)].map((_, i) => (
+            <View key={i} style={{ width: '90%', height: 120, backgroundColor: colors.card, borderRadius: 16, marginBottom: 16, opacity: 0.5 }} />
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   if (loading && initialLoad) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1140,6 +1154,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onTabBarVisibilityC
           minimumViewTime: 300,
           itemVisiblePercentThreshold: 70,
         }}
+        initialNumToRender={5}
+        windowSize={5}
+        removeClippedSubviews={true}
       />
       <Modal
         visible={commentModalVisible}

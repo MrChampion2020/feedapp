@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { StyleSheet, View, Platform, Animated } from "react-native"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
@@ -38,6 +38,7 @@ import FAQsScreen from "../screens/Settings/FAQs"
 import SupportScreen from "../screens/Settings/Support"
 import TermsScreen from "../screens/Settings/Terms"
 import PrivacyScreen from "../screens/Settings/Privacy"
+import EditProfileScreen from '../screens/Settings/EditProfile'
 
 import type { RootStackParamList, TabNavigatorParamList, SettingsStackParamList } from "../types/navigation"
 
@@ -55,6 +56,7 @@ function SettingsNavigator() {
       <Stack.Screen name="Notifications" component={NotificationScreen} />
       <Stack.Screen name="FAQs" component={FAQsScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
+      <SettingsStack.Screen name="EditProfile" component={EditProfileScreen} />
     </SettingsStack.Navigator>
   )
 }
@@ -77,82 +79,31 @@ function HomeStack() {
 }
 
 function TabNavigator() {
-  const { user } = useAuth()
-  const [tabBarVisible, setTabBarVisible] = useState(true)
-  const [activeTab, setActiveTab] = useState("Home")
-  const tabBarTranslateY = useRef(new Animated.Value(0)).current
-
-  const handleTabBarVisibilityChange = (visible: boolean, currentRouteName: string) => {
-    // Hide tab bar if the current route is "Chat", "Add", or "Settings" or any nested route within them
-    const isHiddenRoute = ["Chat", "Add", "Settings"].includes(currentRouteName)
-    const shouldShowTabBar = !isHiddenRoute && visible
-    setTabBarVisible(shouldShowTabBar)
-    Animated.timing(tabBarTranslateY, {
-      toValue: shouldShowTabBar ? 0 : 100,
-      duration: 200,
-      useNativeDriver: true,
-    }).start()
-  }
-
+  const { user } = useAuth();
   return (
-    <>
-      <Tab.Navigator
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: { display: "none" }, // Hide the default tab bar
-        }}
-        screenListeners={{
-          state: (e) => {
-            const state = e.data.state
-            const currentRoute = state.routes[state.index]
-            let currentRouteName = currentRoute.name === "HomeTab" ? "Home" : currentRoute.name
-
-            // Check for nested routes
-            if (currentRoute.state) {
-              const nestedRoute = currentRoute.state.routes[currentRoute.state.index]
-              currentRouteName = nestedRoute.name === "HomeTab" ? "Home" : nestedRoute.name
-            }
-
-            setActiveTab(currentRouteName)
-            handleTabBarVisibilityChange(true, currentRouteName)
-          },
-        }}
-      >
-        <Tab.Screen name="HomeTab" options={{ tabBarButton: () => null }}>
-          {(props) => <HomeStack />}
-        </Tab.Screen>
-        <Tab.Screen name="Chat" children={() => <ChatScreen />} options={{ tabBarButton: () => null }} />
-        <Tab.Screen name="Add" children={() => <UploadFeed />} options={{ tabBarButton: () => null }} />
-        <Tab.Screen
-          name="Profile"
-          children={() => <UserProfileScreen userId={user?.id || ""} />}
-          options={{ tabBarButton: () => null }}
-        />
-        <Tab.Screen name="Settings" component={SettingsNavigator} options={{ tabBarButton: () => null }} />
-        <Tab.Screen name="PostView" component={PostView} />
-        <Tab.Screen name="Search" options={{ tabBarButton: () => null }}>
-          {(props) => <SearchScreen {...props} />}
-        </Tab.Screen>
-      </Tab.Navigator>
-
-      <Animated.View
-        style={[
-          styles.tabBarWrapper,
-          {
-            transform: [{ translateY: tabBarTranslateY }],
-            display: tabBarVisible ? "flex" : "none",
-          },
-        ]}
-      >
-        <TabBar
-          activeTab={activeTab}
-          onTabPress={(tab) => {
-            // Handle tab navigation
-          }}
-        />
-      </Animated.View>
-    </>
-  )
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: "none" },
+      }}
+    >
+      <Tab.Screen name="HomeTab" options={{ tabBarButton: () => null }}>
+        {(props) => <HomeStack />}
+      </Tab.Screen>
+      <Tab.Screen name="Chat" children={() => <ChatScreen />} options={{ tabBarButton: () => null }} />
+      <Tab.Screen name="Add" children={() => <UploadFeed />} options={{ tabBarButton: () => null }} />
+      <Tab.Screen
+        name="Profile"
+        children={() => <UserProfileScreen userId={user?.id || ""} />}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen name="Settings" component={SettingsNavigator} options={{ tabBarButton: () => null }} />
+      <Tab.Screen name="PostView" component={PostView} />
+      <Tab.Screen name="Search" options={{ tabBarButton: () => null }}>
+        {(props) => <SearchScreen {...props} />}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
 }
 
 function AuthStack() {
@@ -170,110 +121,113 @@ function AuthStack() {
 }
 
 export function Navigation() {
-  const { user, token } = useAuth()
-  const [currentTab, setCurrentTab] = useState("Home")
-  const [hideTabBar, setHideTabBar] = useState(false)
-  const navigationRef = useRef<any>(null)
-  const { colors } = useTheme()
+  const { user, token } = useAuth();
+  const [currentTab, setCurrentTab] = useState("Home");
+  const [hideTabBar, setHideTabBar] = useState(false);
+  const navigationRef = useRef<any>(null);
+  const { colors } = useTheme();
 
   // Function to handle tab press
   const handleTabPress = (tabName: string) => {
-    setCurrentTab(tabName)
+    setCurrentTab(tabName);
     if (navigationRef.current) {
       if (tabName === "Add") {
-        navigationRef.current.navigate("Add")
+        navigationRef.current.navigate("Add");
       } else if (tabName === "Profile") {
-        navigationRef.current.navigate("Profile", { userId: user?.id || "" })
+        navigationRef.current.navigate("Profile", { userId: user?.id || "" });
       } else if (tabName === "Home") {
-        navigationRef.current.navigate("HomeTab")
+        navigationRef.current.navigate("HomeTab");
       } else {
-        navigationRef.current.navigate(tabName)
+        navigationRef.current.navigate(tabName);
       }
     }
-  }
+  };
 
   // Determine if we should hide the tab bar based on the current route
   const shouldHideTabBar = (state: any): boolean => {
-    if (!state) return false
+    if (!state) return false;
 
     // Get the current active route
-    const routes = state.routes
-    const currentRoute = routes[state.index]
+    const routes = state.routes;
+    const currentRoute = routes[state.index];
 
     // Hide tab bar for auth routes
-    const authRoutes = ["/", "Login", "SignUp", "Verify", "ChangePassword"]
+    const authRoutes = ["/", "Login", "SignUp", "Verify", "ChangePassword"];
     if (authRoutes.includes(currentRoute.name)) {
-      return true
+      return true;
     }
 
     // Hide tab bar for Chat, Add, and Settings tabs
     if (["Chat", "Add", "Settings"].includes(currentRoute.name)) {
-      return true
+      return true;
     }
 
     // For nested navigators, check their state too
     if (currentRoute.state) {
       // Check if any screen in the nested navigator is within Chat, Add, or Settings
-      const nestedRoutes = currentRoute.state.routes
-      const nestedCurrentRoute = nestedRoutes[currentRoute.state.index]
+      const nestedRoutes = currentRoute.state.routes;
+      const nestedCurrentRoute = nestedRoutes[currentRoute.state.index];
       if (["Chat", "Add", "Settings"].includes(nestedCurrentRoute.name)) {
-        return true
+        return true;
       }
 
       // Continue checking deeper nested states
-      return shouldHideTabBar(currentRoute.state)
+      return shouldHideTabBar(currentRoute.state);
     }
 
-    return false
-  }
+    return false;
+  };
 
   // Handle navigation state changes
   const handleNavigationStateChange = (state: any) => {
-    if (!state) return
+    if (!state) return;
 
     // Get the current active route
-    const currentRoute = state.routes[state.index]
+    const currentRoute = state.routes[state.index];
 
     // Update the current tab if it's a main tab
     if (["HomeTab", "Chat", "Add", "Profile", "Settings"].includes(currentRoute.name)) {
-      setCurrentTab(currentRoute.name === "HomeTab" ? "Home" : currentRoute.name)
+      setCurrentTab(currentRoute.name === "HomeTab" ? "Home" : currentRoute.name);
     }
 
     // Determine if we should hide the tab bar
-    setHideTabBar(shouldHideTabBar(state))
-  }
+    setHideTabBar(shouldHideTabBar(state));
+  };
 
   return (
     <NavigationContainer
       ref={navigationRef}
       onStateChange={handleNavigationStateChange}
       onReady={() => {
-        const state = navigationRef.current?.getRootState()
+        const state = navigationRef.current?.getRootState();
         if (state) {
-          setHideTabBar(shouldHideTabBar(state))
+          setHideTabBar(shouldHideTabBar(state));
         }
       }}
     >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {token ? (
-          <Stack.Screen name="Main" options={{ headerShown: false }}>
-            {() => (
-              <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <TabNavigator />
-                {!hideTabBar && (
-                  <View style={[styles.tabBarWrapper, { backgroundColor: colors.tabbg }]}>
-                    <TabBar activeTab={currentTab} onTabPress={handleTabPress} />
-                  </View>
-                )}
-              </View>
-            )}
-          </Stack.Screen>
+          <>
+            <Stack.Screen name="Main" options={{ headerShown: false }}>
+              {() => (
+                <View style={[styles.container, { backgroundColor: colors.background }]}> 
+                  <TabNavigator />
+                  {!hideTabBar && (
+                    <View style={[styles.tabBarWrapper, { backgroundColor: colors.tabbg }]}> 
+                      <TabBar activeTab={currentTab} onTabPress={handleTabPress} />
+                    </View>
+                  )}
+                </View>
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          </>
         ) : (
           <Stack.Screen name="Auth" component={AuthStack} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
-  )
+  );
 }
 
 export default function App() {
@@ -555,4 +509,3 @@ const styles = StyleSheet.create({
 //     zIndex: 999,
 //   },
 // })
-// // "use client"
